@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POKER_EQUITY :: terminal</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=VT323&display=swap');
+  :root{
+    --bg:#020803;--bg2:#04120a;--green:#39ff14;--green-dim:#1da30c;--green-deep:#0a3d05;
+    --amber:#ffb000;--red:#ff2b2b;--cyan:#0ff;--grid:rgba(57,255,20,.06);
+    --line:rgba(57,255,20,.25);--scan:rgba(0,0,0,.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scrollbar-color:var(--green-dim) var(--bg)}
+  body{font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--green);min-height:100vh;padding:26px 16px 70px;position:relative;overflow-x:hidden;text-shadow:0 0 4px rgba(57,255,20,.45)}
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:32px 32px;mask-image:radial-gradient(ellipse at 50% 30%,#000 30%,transparent 80%)}
+  body::after{content:"";position:fixed;inset:0;z-index:99;pointer-events:none;background:repeating-linear-gradient(0deg,var(--scan),var(--scan) 1px,transparent 1px,transparent 3px);animation:flicker 5s infinite;mix-blend-mode:multiply}
+  @keyframes flicker{0%,100%{opacity:.55}50%{opacity:.4}97%{opacity:.6}98%{opacity:.3}}
+  .wrap{max-width:900px;margin:0 auto;position:relative;z-index:1}
+  header{margin-bottom:26px;border:1px solid var(--line);background:rgba(4,18,10,.6);padding:18px 20px;position:relative}
+  header::before{content:"● ● ●";position:absolute;top:8px;right:14px;font-size:9px;letter-spacing:3px;color:var(--green-dim)}
+  .prompt{font-size:12px;color:var(--green-dim);margin-bottom:8px}
+  .prompt::before{content:"root@equity:~$ ";color:var(--amber)}
+  h1{font-family:'VT323',monospace;font-size:clamp(34px,7vw,62px);line-height:.9;letter-spacing:2px;color:var(--green);text-shadow:0 0 8px var(--green),0 0 22px rgba(57,255,20,.5)}
+  .blink{animation:blink 1.1s step-end infinite;color:var(--green)}
+  @keyframes blink{50%{opacity:0}}
+  .sub{font-size:11px;color:var(--green-dim);margin-top:10px;letter-spacing:1px;line-height:1.7}
+  .sub b{color:var(--amber)}
+  .panel{border:1px solid var(--line);background:rgba(4,18,10,.45);padding:18px 20px;margin-bottom:16px;position:relative}
+  .panel::before{content:attr(data-tag);position:absolute;top:-9px;left:14px;background:var(--bg);padding:0 8px;font-size:10px;letter-spacing:2px;color:var(--green-dim);text-transform:uppercase}
+  .panel h2{font-family:'VT323',monospace;font-size:22px;color:var(--amber);margin-bottom:15px;letter-spacing:1px;display:flex;gap:10px;align-items:baseline;text-shadow:0 0 6px rgba(255,176,0,.5)}
+  .panel h2 small{font-family:'JetBrains Mono';font-size:10px;color:var(--green-dim);letter-spacing:1px;text-shadow:none}
+  .panel h2::before{content:">";color:var(--green)}
+  .controls{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green-dim)}
+  .field label::before{content:"[ "}.field label::after{content:" ]"}
+  select,input[type=number]{background:#020a05;color:var(--green);border:1px solid var(--line);padding:9px 12px;font-family:inherit;font-size:14px;border-radius:0;text-shadow:0 0 4px rgba(57,255,20,.5)}
+  select:focus,input:focus{outline:none;border-color:var(--green);box-shadow:0 0 10px rgba(57,255,20,.4)}
+  .hero-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .slots{display:flex;gap:8px}
+  .card-slot{width:54px;height:70px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'VT323',monospace;font-size:24px;border:1px solid var(--line);user-select:none;transition:.1s;background:#020a05;color:var(--green-dim)}
+  .card-slot.empty::after{content:"_"}
+  .card-slot.filled{background:#ece8df;border-color:#fff;box-shadow:0 0 10px rgba(255,255,255,.3)}
+  /* классическая колода на светлом фоне: ♠♣ чёрные · ♥♦ красные */
+  .card-slot.filled.spade  {color:#1a1a1a;border-color:#fff;text-shadow:none}
+  .card-slot.filled.heart  {color:#d11a1a;border-color:#fff;text-shadow:none}
+  .card-slot.filled.diamond{color:#d11a1a;border-color:#fff;text-shadow:none}
+  .card-slot.filled.club   {color:#1a1a1a;border-color:#fff;text-shadow:none}
+  .card-slot:hover{border-color:var(--amber)}
+  .card-slot.active{border-color:var(--amber);box-shadow:0 0 12px rgba(255,176,0,.6)}
+  /* сетка быстрого выбора 52 карт */
+  .card-grid-panel{margin-bottom:16px}
+  .card-grid{display:flex;flex-direction:column;gap:6px}
+  .grid-suit-row{display:grid;grid-template-columns:repeat(13,1fr);gap:5px}
+  .gc{aspect-ratio:5/7;background:#ece8df;border:1px solid #fff;display:flex;align-items:center;justify-content:center;font-family:'VT323';font-size:clamp(13px,2.2vw,20px);cursor:pointer;transition:.08s;border-radius:3px;font-weight:600}
+  .gc.spade{color:#1a1a1a}.gc.heart{color:#d11a1a}.gc.diamond{color:#d11a1a}.gc.club{color:#1a1a1a}
+  .gc:hover{transform:translateY(-2px);box-shadow:0 0 10px rgba(255,176,0,.6);border-color:var(--amber)}
+  .gc.used{opacity:.18;pointer-events:none;filter:grayscale(1)}
+  .board-slots{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .board-slots .gap{width:18px;text-align:center;color:var(--green-dim)}
+  .board-slots .gap::after{content:"|"}
+  .street-tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .street-tab{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:7px 14px;font-size:11px;letter-spacing:1px;cursor:pointer;text-transform:uppercase}
+  .street-tab.active{border-color:var(--green);color:var(--green);background:var(--green-deep);box-shadow:0 0 10px rgba(57,255,20,.3)}
+  .btn-row{display:flex;gap:12px;flex-wrap:wrap}
+  button.go{background:var(--green-deep);color:var(--green);border:1px solid var(--green);font-family:'JetBrains Mono';font-weight:700;font-size:14px;letter-spacing:1px;padding:13px 28px;cursor:pointer;text-transform:uppercase;text-shadow:0 0 6px var(--green);transition:.12s}
+  button.go::before{content:"> "}
+  button.go:hover{background:var(--green);color:#020803;text-shadow:none;box-shadow:0 0 18px rgba(57,255,20,.6)}
+  button.go:disabled{opacity:.5;cursor:wait}
+  button.ghost{background:transparent;color:var(--green-dim);border:1px solid var(--line);padding:13px 20px;cursor:pointer;font-family:inherit;font-size:13px;letter-spacing:1px;text-transform:uppercase}
+  button.ghost:hover{border-color:var(--amber);color:var(--amber)}
+  .result{display:none}
+  .result.show{display:block;animation:boot .35s ease}
+  @keyframes boot{from{opacity:0;clip-path:inset(0 0 100% 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}
+  .big-eq{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px}
+  .eq-card{flex:1;min-width:140px;border:1px solid var(--line);background:rgba(0,0,0,.3);padding:16px;text-align:center}
+  .eq-card.win{border-color:var(--green)}
+  .eq-card.lose{border-color:var(--red)}
+  .eq-card .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green-dim);margin-bottom:8px}
+  .eq-card .num{font-family:'VT323';font-size:54px;line-height:.9}
+  .eq-card.win .num{color:var(--green);text-shadow:0 0 12px rgba(57,255,20,.6)}
+  .eq-card.lose .num{color:var(--red);text-shadow:0 0 12px rgba(255,43,43,.6)}
+  .eq-card .sub{font-size:10px;color:var(--green-dim);margin-top:6px}
+  /* цветовые зоны шанса выигрыша */
+  .eq-card.win.z-dom{border-color:#39ff14;box-shadow:0 0 22px rgba(57,255,20,.45),0 0 22px rgba(57,255,20,.25) inset}
+  .eq-card.win.z-dom .num{color:#39ff14;text-shadow:0 0 16px #39ff14,0 0 30px rgba(57,255,20,.7)}
+  .eq-card.win.z-ahead{border-color:#7dff5a;box-shadow:0 0 14px rgba(125,255,90,.35)}
+  .eq-card.win.z-ahead .num{color:#7dff5a;text-shadow:0 0 12px rgba(125,255,90,.6)}
+  .eq-card.win.z-even{border-color:#ffe066}
+  .eq-card.win.z-even .num{color:#ffe066;text-shadow:0 0 12px rgba(255,224,102,.6)}
+  .eq-card.win.z-behind{border-color:#ff9f1c}
+  .eq-card.win.z-behind .num{color:#ff9f1c;text-shadow:0 0 12px rgba(255,159,28,.6)}
+  .eq-card.win.z-weak{border-color:#ff2b2b}
+  .eq-card.win.z-weak .num{color:#ff2b2b;text-shadow:0 0 12px rgba(255,43,43,.6)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.65}}
+  .zone-banner{font-family:'VT323';font-size:26px;letter-spacing:1px;padding:12px 16px;margin-bottom:16px;border:1px solid;text-align:center}
+  .zone-banner.z-dom{color:#39ff14;border-color:#39ff14;background:rgba(57,255,20,.1);box-shadow:0 0 18px rgba(57,255,20,.25) inset}
+  .zone-banner.z-ahead{color:#7dff5a;border-color:#7dff5a;background:rgba(125,255,90,.08)}
+  .zone-banner.z-even{color:#ffe066;border-color:#ffe066;background:rgba(255,224,102,.08)}
+  .zone-banner.z-behind{color:#ff9f1c;border-color:#ff9f1c;background:rgba(255,159,28,.08)}
+  .zone-banner.z-weak{color:#ff2b2b;border-color:#ff2b2b;background:rgba(255,43,43,.08)}
+  /* полоса меняет цвет по зоне */
+  .bar-fill.z-dom{background:repeating-linear-gradient(90deg,#39ff14,#39ff14 6px,#1da30c 6px,#1da30c 9px);box-shadow:0 0 16px rgba(57,255,20,.7)}
+  .bar-fill.z-ahead{background:repeating-linear-gradient(90deg,#7dff5a,#7dff5a 6px,#4fc62e 6px,#4fc62e 9px);box-shadow:0 0 12px rgba(125,255,90,.5)}
+  .bar-fill.z-even{background:repeating-linear-gradient(90deg,#ffe066,#ffe066 6px,#c9a92e 6px,#c9a92e 9px);box-shadow:0 0 12px rgba(255,224,102,.5)}
+  .bar-fill.z-behind{background:repeating-linear-gradient(90deg,#ff9f1c,#ff9f1c 6px,#c4760a 6px,#c4760a 9px);box-shadow:0 0 12px rgba(255,159,28,.5)}
+  .bar-fill.z-weak{background:repeating-linear-gradient(90deg,#ff2b2b,#ff2b2b 6px,#a81414 6px,#a81414 9px);box-shadow:0 0 12px rgba(255,43,43,.5)}
+  .bar-track{height:26px;background:#020a05;border:1px solid var(--line);overflow:hidden;position:relative;margin-bottom:18px}
+  .bar-fill{height:100%;background:repeating-linear-gradient(90deg,var(--green),var(--green) 6px,var(--green-dim) 6px,var(--green-dim) 9px);transition:width .6s steps(20);box-shadow:0 0 12px rgba(57,255,20,.5);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11px;color:#020803;font-weight:700}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .metric{background:rgba(0,0,0,.3);border:1px solid var(--line);padding:13px}
+  .metric .ml{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green-dim);margin-bottom:6px}
+  .metric .ml::before{content:"// "}
+  .metric .mv{font-family:'VT323',monospace;font-size:30px;color:var(--amber);line-height:1;text-shadow:0 0 8px rgba(255,176,0,.5)}
+  .metric .md{font-size:10px;color:var(--green-dim);margin-top:6px;line-height:1.5}
+  .verdict{border:1px solid;padding:15px 18px;font-family:'VT323';font-size:24px;margin-bottom:16px;letter-spacing:1px}
+  .verdict.call{border-color:var(--green);background:rgba(57,255,20,.08);color:var(--green);box-shadow:0 0 16px rgba(57,255,20,.2) inset}
+  .verdict.call::before{content:"[OK] "}
+  .verdict.fold{border-color:var(--red);background:rgba(255,43,43,.08);color:var(--red);box-shadow:0 0 16px rgba(255,43,43,.2) inset}
+  .verdict.fold::before{content:"[!!] "}
+  .verdict.warn{border-color:var(--amber);background:rgba(255,176,0,.08);color:var(--amber)}
+  .verdict.warn::before{content:"[~] "}
+  .verdict .vsub{font-family:'JetBrains Mono';font-size:11px;color:var(--green-dim);margin-top:7px;letter-spacing:.5px;line-height:1.6}
+  .combos{font-size:12px;line-height:1.7;color:var(--green-dim)}
+  .combos h4{font-family:'VT323';color:var(--amber);font-size:18px;margin-bottom:8px;letter-spacing:1px}
+  .preflop-box{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .pf-verdict{font-family:'VT323';font-size:22px;letter-spacing:1px;padding:8px 12px;margin-bottom:10px;border:1px solid;display:inline-block}
+  .pf-verdict.call{color:var(--green);border-color:var(--green);background:rgba(57,255,20,.08)}
+  .pf-verdict.warn{color:var(--amber);border-color:var(--amber);background:rgba(255,176,0,.08)}
+  .pf-verdict.fold{color:var(--red);border-color:var(--red);background:rgba(255,43,43,.08)}
+  .pf-row{font-size:12px;color:var(--green-dim);line-height:1.6;margin-bottom:7px}
+  .pf-row b{color:var(--green)}
+  .pf-advice{color:#cfe8c0;font-size:12px}
+  .pf-lbl{color:var(--amber);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  .pf-outs{margin:4px 0 10px 0;padding-left:18px;font-size:12px;color:var(--green-dim);line-height:1.7}
+  .pf-outs li{margin-bottom:2px}
+  .pf-foot{font-size:11px;color:var(--green-dim);border-top:1px dashed var(--line);padding-top:8px}
+  .combos h4::before{content:"### "}
+  .combos .tag{display:inline-block;border:1px solid var(--line);padding:2px 9px;margin:3px 3px 0 0;font-size:11px;color:var(--green)}
+  .picker-bg{position:fixed;inset:0;background:rgba(2,8,3,.85);display:none;align-items:flex-start;justify-content:center;z-index:200;padding:24px 18px;backdrop-filter:blur(2px);overflow-y:auto}
+  .picker-bg.show{display:flex}
+  .picker{background:var(--bg2);border:1px solid var(--green);padding:18px 20px;max-width:540px;width:100%;box-shadow:0 0 40px rgba(57,255,20,.3);margin-top:8px}
+  .picker h3{font-family:'VT323';color:var(--amber);margin-bottom:14px;font-size:22px;letter-spacing:1px}
+  .picker h3::before{content:"SELECT >> "}
+  .suit-block{margin-bottom:12px}
+  .suit-label{font-size:10px;color:var(--green-dim);margin-bottom:6px;letter-spacing:1.5px;text-transform:uppercase}
+  .suit-label.spade  {color:#7a7a7a}
+  .suit-label.heart  {color:#ff3838}
+  .suit-label.diamond{color:#ff9f1c}
+  .suit-label.club   {color:#b8b8b8}
+  .rank-grid{display:grid;grid-template-columns:repeat(13,1fr);gap:5px}
+  .rc{aspect-ratio:3/4;border:1px solid var(--line);background:#020a05;color:var(--green);display:flex;align-items:center;justify-content:center;font-family:'VT323';font-size:18px;cursor:pointer;transition:.08s}
+  .rc.spade  {color:#7a7a7a}
+  .rc.heart  {color:#ff3838}
+  .rc.diamond{color:#ff9f1c}
+  .rc.club   {color:#b8b8b8}
+  .rc:hover{border-color:var(--green);box-shadow:0 0 10px rgba(57,255,20,.5);transform:translateY(-2px)}
+  .rc.used{opacity:.2;pointer-events:none}
+  .picker-foot{display:flex;justify-content:space-between;margin-top:10px;gap:10px}
+  .note{font-size:11px;color:var(--green-dim);line-height:1.7;margin-top:18px;text-align:center;letter-spacing:.5px}
+  .note::before{content:"/* ";}.note::after{content:" */"}
+  .err{color:var(--amber);font-size:12px;margin-top:10px;min-height:18px;letter-spacing:.5px}
+  .err:not(:empty)::before{content:"ERR >> "}
+  .calc-ok{color:var(--green);font-size:13px;margin-top:8px;min-height:16px;letter-spacing:.5px;text-shadow:0 0 6px rgba(57,255,20,.5)}
+  .calc-ok:not(:empty)::before{content:"✓ "}
+  .hint{font-size:10px;color:var(--green-dim);margin-top:8px;line-height:1.6}
+  /* панель статистики сессии */
+  .session-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+  /* компактная горизонтальная панель */
+  .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 14px;border:1px solid var(--line);background:rgba(4,18,10,.45);margin-bottom:14px;font-size:12px}
+  .tb-item{display:flex;align-items:baseline;gap:6px}
+  .tb-lbl{font-size:10px;color:var(--green-dim);text-transform:uppercase;letter-spacing:1px}
+  .tb-val{font-family:'VT323';font-size:24px;line-height:1}
+  .tb-val.amber{color:var(--amber);text-shadow:0 0 6px rgba(255,176,0,.5)}
+  .tb-val.cyan{color:var(--cyan);text-shadow:0 0 6px rgba(0,255,255,.5)}
+  .tb-sep{width:1px;align-self:stretch;background:var(--line);margin:0 2px}
+  .pos-btns-row{display:flex;gap:4px}
+  .pos-btn-h{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:5px 11px;font-size:11px;cursor:pointer;font-family:inherit;letter-spacing:.5px}
+  .pos-btn-h:hover{border-color:var(--amber);color:var(--amber)}
+  .pos-btn-h.on{border-color:var(--green);color:var(--green);background:var(--green-deep);box-shadow:0 0 8px rgba(57,255,20,.3)}
+  .topbar .pos-hint{font-size:9px;color:var(--green-dim)}
+  .topbar .outcome-hint{font-size:10px}
+  .sbox{border:1px solid var(--line);background:rgba(4,18,10,.55);padding:10px 12px;position:relative}
+  .sbox-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--green-dim);margin-bottom:5px}
+  .sbox-lbl::before{content:"// "}
+  .sbox-val{font-family:'VT323';font-size:30px;line-height:1;color:var(--amber);text-shadow:0 0 8px rgba(255,176,0,.5)}
+  .sbox-val.pos{color:var(--green);text-shadow:0 0 10px rgba(57,255,20,.6)}
+  .sbox-val.neg{color:var(--red);text-shadow:0 0 10px rgba(255,43,43,.6)}
+  .sbox-btns{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;align-items:center}
+  .mini-btn{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:4px 9px;font-size:10px;cursor:pointer;font-family:inherit;letter-spacing:.5px;text-transform:uppercase}
+  .mini-btn:hover{border-color:var(--amber);color:var(--amber)}
+  .mini-btn.win{border-color:var(--green);color:var(--green)}
+  .mini-btn.win:hover{background:var(--green-deep)}
+  .mini-btn.lose{border-color:var(--red);color:var(--red)}
+  .mini-btn.lose:hover{background:rgba(255,43,43,.12)}
+  .mini-btn.on{background:var(--green-deep);border-color:var(--green);color:var(--green)}
+  .sbox-input input{width:64px;background:#020a05;color:var(--green);border:1px solid var(--line);padding:4px 7px;font-family:inherit;font-size:12px}
+  .sbox-input input:focus{outline:none;border-color:var(--green)}
+  .sbox-sub{font-size:10px;color:var(--green-dim);margin-top:5px;letter-spacing:.3px}
+  .ph-wrap{padding:20px 16px}
+  .ph-title{font-family:'VT323';font-size:30px;color:var(--amber);margin-bottom:16px;text-align:center}
+  .ph-steps{display:flex;flex-direction:column;gap:9px}
+  .ph-step{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--green-dim);line-height:1.4}
+  .ph-num{flex-shrink:0;width:22px;height:22px;border:1px solid var(--green);color:var(--green);display:flex;align-items:center;justify-content:center;font-family:'VT323';font-size:16px}
+  .ph-foot{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:10px;color:var(--green-dim);text-align:center;letter-spacing:.5px}
+  .sbox-table{border-color:var(--amber);background:rgba(255,176,0,.06)}
+  .sbox-table .sbox-val{color:var(--amber);font-size:34px}
+  .sbox-pos{min-width:180px}
+  .pos-btns{display:flex;flex-direction:column;gap:4px}
+  .pos-btn{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:5px 9px;font-size:11px;cursor:pointer;font-family:inherit;letter-spacing:.5px;text-align:left;display:flex;justify-content:space-between;align-items:center}
+  .pos-btn em{font-style:normal;font-size:9px;opacity:.6}
+  .pos-btn:hover{border-color:var(--amber);color:var(--amber)}
+  .pos-btn.on{border-color:var(--green);color:var(--green);background:var(--green-deep)}
+  .pos-hint{font-size:9px;color:var(--green-dim);margin-top:6px;line-height:1.4}
+  .opp-pos{font-size:9px;color:var(--amber);border:1px solid var(--amber);padding:1px 5px;margin-left:5px;letter-spacing:.5px;opacity:.8}
+  #callDisplay{color:var(--cyan)}
+  .opp-list{display:flex;flex-direction:column;gap:7px}
+  .opp-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .opp-name{font-size:11px;min-width:60px;color:var(--green-dim)}
+  .opp-btns{display:flex;gap:4px;flex-wrap:wrap}
+  .opp-btn{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:4px 9px;font-size:10px;cursor:pointer;font-family:inherit;letter-spacing:.5px;text-transform:uppercase}
+  .opp-btn:hover{border-color:var(--amber)}
+  .opp-btn.on-live{border-color:var(--green);color:var(--green);background:var(--green-deep)}
+  .opp-btn.on-check{border-color:var(--cyan);color:var(--cyan);background:rgba(0,255,255,.1)}
+  .opp-btn.on-call{border-color:#7dff5a;color:#7dff5a;background:rgba(125,255,90,.1)}
+  .opp-btn.on-raise{border-color:var(--amber);color:var(--amber);background:rgba(255,176,0,.12)}
+  .opp-btn.on-fold{border-color:var(--red);color:var(--red);background:rgba(255,43,43,.1)}
+  .opp-bet{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:10px;color:var(--green-dim)}
+  .opp-bet input{width:60px;background:#020a05;color:var(--amber);border:1px solid var(--line);padding:3px 6px;font-family:inherit;font-size:11px}
+  .opp-bet input:focus{outline:none;border-color:var(--green)}
+  .opp-bet input:disabled{opacity:.3}
+  .opp-row.folded{opacity:.4}
+  .opp-row.folded .opp-name{text-decoration:line-through;color:var(--red)}
+  .opp-row.unmatched{border-left:2px solid var(--amber);padding-left:8px;background:rgba(255,176,0,.05)}
+  .need-respond{font-size:9px;color:var(--amber);margin-left:6px;letter-spacing:.5px}
+  .unmatched-banner{border:1px solid var(--amber);background:rgba(255,176,0,.1);color:var(--amber);font-size:11px;padding:8px 10px;margin-bottom:10px;letter-spacing:.5px;line-height:1.5}
+  .hero-row-player{border:1px solid var(--green);background:rgba(57,255,20,.06);padding-left:8px}
+  .hero-row-player .opp-name{color:var(--green);font-weight:700}
+  .hero-row-player.unmatched{border-color:var(--green);border-left:3px solid var(--green);background:rgba(57,255,20,.12);box-shadow:0 0 12px rgba(57,255,20,.25) inset}
+  .hero-row-player .need-respond{color:var(--green);font-weight:700;animation:blink 1.1s step-end infinite}
+  input[readonly]{opacity:.85;border-style:dashed;cursor:default}
+  .outcome-row{display:flex;gap:8px;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .outcome-row .mini-btn{font-size:13px;padding:8px 16px}
+  .outcome-hint{font-size:10px;color:var(--green-dim)}
+  .tight-row{margin-top:12px;display:flex;flex-direction:column;gap:5px}
+  .tight-row label{font-size:11px;color:var(--green-dim);text-transform:uppercase;letter-spacing:1px}
+  .tight-row label span{color:var(--amber)}
+  .tight-row input[type=range]{width:100%;accent-color:var(--green);background:transparent;cursor:pointer}
+  .tight-scale{display:flex;justify-content:space-between;font-size:9px;color:var(--green-dim);letter-spacing:.5px}
+
+  /* верхняя панель карт раздачи: твои + борд + запуск */
+  .cards-bar{display:grid;grid-template-columns:auto 1fr auto;gap:14px;margin-bottom:16px;align-items:stretch}
+  @media(max-width:780px){.cards-bar{grid-template-columns:1fr}}
+  .cards-panel{margin-bottom:0;padding:13px 16px;display:flex;flex-direction:column}
+  .cards-panel .card-slot{width:60px;height:80px;font-size:26px}
+  .cards-board .board-slots{margin-top:4px}
+  .cards-run{min-width:170px}
+  .cards-run .btn-col{display:flex;flex-direction:column;gap:8px;flex:1;justify-content:center}
+  .cards-run .btn-col button{width:100%}
+  .cards-run .btn-col button.go{padding:14px 18px;font-size:14px}
+  /* ===== компактная двухколоночная раскладка ===== */
+  .layout{display:grid;grid-template-columns:minmax(300px,360px) 1fr;gap:16px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:12px}
+  @media(max-width:780px){.layout{grid-template-columns:1fr}}
+  /* плотнее header и панели */
+  body{padding:18px 14px 24px}
+  header{margin-bottom:16px;padding:12px 16px}
+  h1{font-size:clamp(26px,5vw,40px)}
+  .sub{margin-top:6px;font-size:10px}
+  .panel{padding:13px 15px;margin-bottom:0}
+  .panel h2{font-size:18px;margin-bottom:10px}
+  .layout .controls{gap:12px}
+  .layout select,.layout input[type=number]{padding:7px 10px;font-size:13px}
+  .card-slot{width:44px;height:62px;font-size:25px}
+  .street-tab{padding:6px 11px;font-size:10px}
+  .street-tabs{margin-bottom:10px;gap:6px}
+  .big-eq{gap:12px;margin-bottom:12px}
+  .eq-card{padding:11px;min-width:110px}
+  .eq-card .num{font-size:46px}
+  .eq-card .lbl{margin-bottom:5px}
+  .zone-banner{font-size:22px;padding:9px 12px;margin-bottom:11px}
+  .bar-track{height:22px;margin-bottom:12px}
+  .metrics{gap:7px;margin-bottom:10px;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+  .metric{padding:8px}
+  .metric .mv{font-size:22px}
+  .metric .md{margin-top:4px}
+  .verdict{padding:10px 13px;font-size:18px;margin-bottom:9px}
+  .combos{font-size:11px}
+  .combos h4{font-size:16px;margin-bottom:6px}
+  .btn-row button.go{padding:11px 22px}
+  .btn-row button.ghost{padding:11px 16px}
+  .placeholder{border-style:dashed}
+  .note{margin-top:12px;font-size:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="tb-item"><span class="tb-lbl">банк</span><span class="tb-val amber" id="potDisplay">0</span></div>
+    <div class="tb-item"><span class="tb-lbl">к коллу</span><span class="tb-val cyan" id="callDisplay">0</span></div>
+    <div class="tb-sep"></div>
+    <button class="mini-btn win" id="wonHand">выиграл +<span id="wonAmt">0</span></button>
+    <button class="mini-btn lose" id="lostHand">проиграл −<span id="lostAmt">0</span></button>
+    <button class="mini-btn" id="addFold">фолд</button>
+    <span class="outcome-hint" id="outcomeHint"></span>
+    <div class="tb-sep"></div>
+    <span class="tb-lbl">позиция:</span>
+    <div class="pos-btns-row" id="posBtns">
+      <button class="pos-btn-h" data-pos="utg">UTG</button>
+      <button class="pos-btn-h" data-pos="mp">MP</button>
+      <button class="pos-btn-h" data-pos="co">CO</button>
+      <button class="pos-btn-h on" data-pos="btn">BTN</button>
+      <button class="pos-btn-h" data-pos="blinds">SB/BB</button>
+    </div>
+    <span class="pos-hint" id="posHint">баттон — играй шире</span>
+  </div>
+
+  <div class="cards-bar">
+    <div class="panel cards-panel" data-tag="твоя рука">
+      <h2>твои карты</h2>
+      <div class="slots" id="heroSlots"></div>
+    </div>
+    <div class="panel cards-panel cards-board" data-tag="борд">
+      <h2>общие карты</h2>
+      <div class="street-tabs" id="streetTabs">
+        <div class="street-tab active" data-n="0">префлоп</div>
+        <div class="street-tab" data-n="3">флоп</div>
+        <div class="street-tab" data-n="4">тёрн</div>
+        <div class="street-tab" data-n="5">ривер</div>
+      </div>
+      <div class="board-slots" id="board"></div>
+    </div>
+    <div class="panel cards-panel cards-run" data-tag="запуск">
+      <h2>расчёт</h2>
+      <div class="btn-col">
+        <button class="go" id="calcBtn">рассчитать</button>
+        <button class="ghost" id="clearBtn">следующая игра</button>
+      </div>
+      <div class="err" id="err"></div>
+      <div class="calc-ok" id="calcOk"></div>
+    </div>
+  </div>
+
+  <div class="panel card-grid-panel" data-tag="выбор карт">
+    <h2>выбери карту <small>клик по слоту выше → клик по карте здесь</small></h2>
+    <div id="cardGrid" class="card-grid"></div>
+  </div>
+
+  <div class="layout">
+   <div class="col col-in">
+    <div class="panel" data-tag="стол">
+      <h2>стол <small>блайнды, валюта, игроки</small></h2>
+      <div class="controls">
+        <div class="field"><label>блайнды</label>
+          <select id="blinds">
+            <option value="0.05/0.1">0.05 / 0.10</option>
+            <option value="0.25/0.5">0.25 / 0.50</option>
+            <option value="0.5/1">0.50 / 1</option>
+            <option value="1/2" selected>1 / 2</option>
+            <option value="2/4">2 / 4</option>
+            <option value="5/10">5 / 10</option>
+            <option value="10/20">10 / 20</option>
+            <option value="25/50">25 / 50</option>
+            <option value="50/100">50 / 100</option>
+            <option value="100/200">100 / 200</option>
+          </select>
+        </div>
+        <div class="field"><label>валюта</label>
+          <select id="currency">
+            <option value="₽">₽ рубль</option>
+            <option value="$" selected>$ доллар</option>
+            <option value="€">€ евро</option>
+            <option value="₴">₴ гривна</option>
+            <option value="£">£ фунт</option>
+            <option value="¥">¥ юань/иена</option>
+            <option value="">без символа</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:10px">
+        <div class="field"><label>игроков</label><select id="numPlayers"></select></div>
+        <div class="field"><label>точность</label>
+          <select id="iters">
+            <option value="10000">10k :: быстро</option>
+            <option value="50000" selected>50k :: точно</option>
+            <option value="200000">200k :: макс</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint">// SB+BB кладутся в банк автоматически как стартовые блайнды</div>
+    </div>
+
+    <div class="panel" data-tag="соперники">
+      <h2>соперники <small>отметь, кто что сделал</small></h2>
+      <div id="unmatchedBanner" class="unmatched-banner" style="display:none"></div>
+      <div id="oppList" class="opp-list"></div>
+      <div class="tight-row">
+        <label>тип стола: <span id="tightLabel">средний</span></label>
+        <input type="range" id="tightness" min="0" max="100" value="50" step="5">
+        <div class="tight-scale"><span>лузовый</span><span>тайтовый</span></div>
+      </div>
+      <div class="hint">// фолд убирает из расчёта · колл/рейз = узкий диапазон · ползунок задаёт, насколько тайтово играют соперники</div>
+    </div>
+
+    <div style="display:none">
+      <input type="number" id="heroBet" value="0">
+      <input type="number" id="stackSize" value="500">
+      <input type="number" id="potSize" value="0" readonly>
+      <input type="number" id="betSize" value="0" readonly>
+    </div>
+
+   </div>
+
+   <div class="col col-out">
+    <div class="panel result" data-tag="вероятность" id="result">
+      <h2>твоя вероятность <small id="resMeta"></small></h2>
+      <div class="zone-banner" id="zoneBanner" style="display:none"></div>
+      <div class="big-eq">
+        <div class="eq-card win"><div class="lbl">шанс выиграть</div><div class="num" id="winNum">—</div><div class="sub" id="winSub"></div></div>
+        <div class="eq-card lose"><div class="lbl">шанс проиграть</div><div class="num" id="loseNum">—</div><div class="sub">остаться без банка</div></div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="eqBar" style="width:0%"></div></div>
+      <div class="combos" id="strengthBox"></div>
+      <div class="preflop-box" id="preflopBox" style="display:none"></div>
+    </div>
+
+    <div class="panel result" data-tag="решение" id="decision">
+      <h2>что делать</h2>
+      <div class="metrics" id="metrics"></div>
+      <div class="verdict" id="verdict"></div>
+      <div class="combos" id="combosBox"></div>
+    </div>
+
+    <div class="panel placeholder" id="placeholder">
+      <div class="ph-wrap">
+        <div class="ph-title">// ожидание данных</div>
+        <div class="ph-steps">
+          <div class="ph-step"><span class="ph-num">1</span> задай стол: блайнды, валюту, число игроков</div>
+          <div class="ph-step"><span class="ph-num">2</span> отметь статусы соперников и свои карты</div>
+          <div class="ph-step"><span class="ph-num">3</span> впиши вложения — банк и колл посчитаются сами</div>
+          <div class="ph-step"><span class="ph-num">4</span> нажми «рассчитать» — появится вероятность и совет</div>
+          <div class="ph-step"><span class="ph-num">5</span> после руки нажми «выиграл / проиграл» сверху</div>
+        </div>
+        <div class="ph-foot">здесь появятся: шанс выигрыша · рекомендация · pot odds · EV</div>
+      </div>
+    </div>
+   </div>
+  </div>
+
+  <p class="note">тренажёр для разбора рук — equity это точная математика, а не предсказание соперника</p>
+</div>
+
+<script>
+const RANKS=['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUITS=[{s:'s',sym:'♠',c:'spade'},{s:'h',sym:'♥',c:'heart'},{s:'d',sym:'♦',c:'diamond'},{s:'c',sym:'♣',c:'club'}];
+const RVAL={}; RANKS.forEach((r,i)=>RVAL[r]=i+2);
+
+let state={
+  numPlayers:6,      // всего за столом, включая тебя
+  hero:[null,null],  // твои 2 карты
+  heroBet:0,         // сколько hero уже вложил в банк на этой раздаче
+  heroStatus:'live', // статус hero в раздаче
+  board:[null,null,null,null,null],
+  streetN:0,         // сколько слотов борда показываем: 0/3/4/5
+  opps:[],           // соперники: [{status, bet}], длина = numPlayers-1
+  tightness:50,      // 0 лузовый .. 100 тайтовый
+  position:'btn',    // позиция hero: utg/mp/co/btn/blinds
+  sb:1, bb:2,        // малый/большой блайнд
+  cur:'$',           // символ валюты
+  session:{balance:0,tables:0,hands:0,elapsed:0,running:false}
+};
+function syncOpps(){
+  const need=state.numPlayers-1;
+  while(state.opps.length<need) state.opps.push({status:'live',bet:0});
+  state.opps.length=need;
+  state.opps.forEach(o=>{if(o.bet===undefined)o.bet=0;});
+  assignPositions();
+}
+// автоназначение позиций: соперники получают позиции от ранней к поздней.
+// Полный набор позиций для N игроков; hero считается на баттоне (последний ход).
+function assignPositions(){
+  const n=state.numPlayers;
+  // порядок позиций для стола (от ранней к BTN), берём хвост по числу игроков
+  const order9=['utg','utg','mp','mp','co','co','btn','sb','bb'];
+  // выбираем ярлыки под n игроков: hero=btn, остальным раздаём оставшиеся по силе позиции
+  const labelsByN={
+    2:['bb'], 3:['sb','bb'], 4:['co','sb','bb'], 5:['mp','co','sb','bb'],
+    6:['utg','mp','co','sb','bb'], 7:['utg','mp','co','co','sb','bb'],
+    8:['utg','utg','mp','co','co','sb','bb'], 9:['utg','utg','mp','mp','co','co','sb','bb']
+  };
+  const labels=labelsByN[n]||labelsByN[6];
+  state.opps.forEach((o,i)=>{ o.pos=labels[i]||'mp'; });
+}
+// активная цель ввода задаётся через activeTarget ниже
+
+// ---------- controls ----------
+const npSel=document.getElementById('numPlayers');
+for(let n=2;n<=9;n++){const o=document.createElement('option');o.value=n;o.textContent=n;npSel.appendChild(o);}
+npSel.value=6;
+npSel.onchange=()=>{state.numPlayers=+npSel.value;syncOpps();renderOpps();};
+
+// street tabs
+document.querySelectorAll('.street-tab').forEach(tab=>{
+  tab.onclick=()=>{
+    const n=+tab.dataset.n;
+    state.streetN=n;
+    // очищаем слоты борда за пределами улицы
+    for(let i=n;i<5;i++) state.board[i]=null;
+    document.querySelectorAll('.street-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    // сдвигаем активную цель на первый пустой слот новой улицы:
+    // уже выбранные карты остаются на месте, следующий клик идёт в новую улицу
+    activeTarget=nextEmptyTarget();
+    renderHero();
+    renderBoard();
+  };
+});
+
+function cardClass(card){if(!card)return '';return SUITS.find(x=>x.s===card[1]).c;}
+function cardLabel(card){if(!card)return '';const sym=SUITS.find(x=>x.s===card[1]).sym;const r=card[0]==='T'?'10':card[0];return r+sym;}
+
+function usedCards(except){
+  const used=new Set();
+  state.hero.forEach((c,i)=>{if(c&&!(except&&except.type==='hero'&&except.i===i))used.add(c);});
+  state.board.forEach((c,i)=>{if(c&&!(except&&except.type==='board'&&except.i===i))used.add(c);});
+  return used;
+}
+
+function makeSlot(card,target){
+  const d=document.createElement('div');
+  const isActive=activeTarget&&activeTarget.type===target.type&&activeTarget.i===target.i;
+  if(card){d.className='card-slot filled '+cardClass(card);d.textContent=cardLabel(card);}
+  else{d.className='card-slot empty'+(isActive?' active':'');}
+  if(card&&isActive)d.className+=' active';
+  d.onclick=()=>{ if(card){clearTarget(target);} else {setActiveTarget(target);} };
+  return d;
+}
+
+function renderHero(){
+  const c=document.getElementById('heroSlots');c.innerHTML='';
+  state.hero.forEach((card,i)=>c.appendChild(makeSlot(card,{type:'hero',i})));
+}
+function renderBoard(){
+  const bc=document.getElementById('board');bc.innerHTML='';
+  if(state.streetN===0){
+    bc.innerHTML='<div class="hint" style="margin:0">// префлоп — общих карт пока нет. Считаем твою руку против случайных рук соперников.</div>';
+    return;
+  }
+  for(let i=0;i<state.streetN;i++){
+    bc.appendChild(makeSlot(state.board[i],{type:'board',i}));
+    if(i===2&&state.streetN>3){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
+    if(i===3&&state.streetN>4){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
+  }
+}
+function renderOpps(){
+  syncOpps();
+  const box=document.getElementById('oppList');box.innerHTML='';
+  const labels={live:'в игре',check:'чек',call:'колл',raise:'рейз',fold:'фолд'};
+
+  // ---- строка HERO (ты) ----
+  (()=>{
+    const o={get status(){return state.heroStatus;},set status(v){state.heroStatus=v;},
+             get bet(){return state.heroBet;},set bet(v){state.heroBet=v;}};
+    const row=document.createElement('div');
+    row.className='opp-row hero-row-player'+(state.heroStatus==='fold'?' folded':'');
+    row.dataset.idx='hero';
+    row.innerHTML=`<div class="opp-name">Игрок 1 (ты)</div>`;
+    const btns=document.createElement('div');btns.className='opp-btns';
+    ['live','check','call','raise','fold'].forEach(st=>{
+      const b=document.createElement('div');
+      b.className='opp-btn'+(state.heroStatus===st?' on-'+st:'');
+      b.textContent=labels[st];
+      b.onclick=()=>{state.heroStatus=st;renderOpps();recalcPot();};
+      btns.appendChild(b);
+    });
+    row.appendChild(btns);
+    const betWrap=document.createElement('div');betWrap.className='opp-bet';
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.step='1';
+    inp.value=state.heroBet||0;inp.placeholder='0';
+    inp.disabled=(state.heroStatus==='fold');
+    inp.oninput=()=>{state.heroBet=parseFloat(inp.value)||0;
+      const hb=document.getElementById('heroBet');if(hb)hb.value=state.heroBet;
+      recalcPot();};
+    betWrap.innerHTML='<span>вложил:</span>';betWrap.appendChild(inp);
+    const need=document.createElement('span');need.className='need-respond';need.dataset.need='hero';
+    betWrap.appendChild(need);
+    row.appendChild(betWrap);
+    box.appendChild(row);
+  })();
+
+  state.opps.forEach((o,i)=>{
+    const row=document.createElement('div');row.className='opp-row'+(o.status==='fold'?' folded':'');
+    row.dataset.idx=i;
+    const posNm={utg:'UTG',mp:'MP',co:'CO',btn:'BTN',sb:'SB',bb:'BB'}[o.pos]||'';
+    row.innerHTML=`<div class="opp-name">Игрок ${i+2} <span class="opp-pos">${posNm}</span></div>`;
+    const btns=document.createElement('div');btns.className='opp-btns';
+    ['live','check','call','raise','fold'].forEach(st=>{
+      const b=document.createElement('div');
+      b.className='opp-btn'+(o.status===st?' on-'+st:'');
+      b.textContent=labels[st];
+      b.onclick=()=>{o.status=st;renderOpps();recalcPot();};
+      btns.appendChild(b);
+    });
+    row.appendChild(btns);
+    // поле "вложил"
+    const betWrap=document.createElement('div');betWrap.className='opp-bet';
+    const inp=document.createElement('input');inp.type='number';inp.min='0';inp.step='1';
+    inp.value=o.bet||0;inp.placeholder='0';
+    inp.disabled=(o.status==='fold');
+    inp.oninput=()=>{o.bet=parseFloat(inp.value)||0;recalcPot();};
+    betWrap.innerHTML='<span>вложил:</span>';betWrap.appendChild(inp);
+    // метка "нужно ответить"
+    const need=document.createElement('span');need.className='need-respond';need.dataset.need=i;
+    betWrap.appendChild(need);
+    row.appendChild(betWrap);
+    box.appendChild(row);
+  });
+  updateUnmatchedUI();
+}
+// подсветка тех, кто не уравнял максимальную ставку
+function updateUnmatchedUI(){
+  const box=document.getElementById('oppList');
+  if(!box)return;
+  // сбросить
+  box.querySelectorAll('.opp-row').forEach(r=>r.classList.remove('unmatched'));
+  box.querySelectorAll('.need-respond').forEach(n=>n.textContent='');
+  unmatched.forEach(idx=>{
+    if(idx===-1){
+      // hero
+      const row=box.querySelector('.opp-row[data-idx="hero"]');
+      if(row){
+        row.classList.add('unmatched');
+        const n=row.querySelector('.need-respond[data-need="hero"]');
+        if(n)n.textContent='← ТВОЙ ХОД: колл / рейз / фолд';
+      }
+      return;
+    }
+    const row=box.querySelector(`.opp-row[data-idx="${idx}"]`);
+    if(row){
+      row.classList.add('unmatched');
+      const n=row.querySelector(`.need-respond[data-need="${idx}"]`);
+      if(n)n.textContent='← нужно ответить: колл / рейз / фолд';
+    }
+  });
+  // баннер о несведённом банке
+  const banner=document.getElementById('unmatchedBanner');
+  if(banner){
+    const cnt=unmatched.filter(i=>i!==-1).length;
+    const heroNeed=unmatched.includes(-1);
+    if(cnt>0||heroNeed){
+      banner.style.display='block';
+      const who=[];
+      if(heroNeed)who.push('ты');
+      if(cnt>0)who.push(`${cnt} соперник(ов)`);
+      banner.textContent=`⚠ ставки не сведены: ${who.join(' и ')} ещё не ответил(и) на максимальную ставку`;
+    } else {
+      banner.style.display='none';
+    }
+  }
+}
+// пересчёт банка из всех вложений + ставки к коллу + контроль ответа на рейз
+let unmatched=[];   // индексы активных соперников, не уравнявших макс. ставку (-1 = hero)
+function recalcPot(){
+  syncOpps();
+  // максимальная ставка за столом среди всех, кто ещё в игре (включая hero и блайнды)
+  let maxBet=Math.max(state.bb||0, state.heroBet||0);
+  state.opps.forEach(o=>{if(o.status!=='fold' && (o.bet||0)>maxBet)maxBet=o.bet||0;});
+
+  // банк = блайнды(SB) + все вложения всех (включая фолднувших — их деньги в банке)
+  let pot=(state.sb||0)+(state.bb||0)+(state.heroBet||0);
+  state.opps.forEach(o=>{pot+=o.bet||0;});
+
+  // кто из активных не уравнял максимальную ставку
+  unmatched=[];
+  if(state.heroStatus!=='fold' && (state.heroBet||0)<maxBet) unmatched.push(-1);
+  state.opps.forEach((o,i)=>{
+    if(o.status!=='fold' && (o.bet||0)<maxBet) unmatched.push(i);
+  });
+
+  // ставка к коллу для hero = макс. ставка минус то, что hero уже вложил
+  const toCall=Math.max(0,maxBet-(state.heroBet||0));
+  betOverride=null;
+  const potEl=document.getElementById('potSize');
+  const betEl=document.getElementById('betSize');
+  if(potEl)potEl.value=Math.round(pot);
+  if(betEl)betEl.value=Math.round(toCall);
+  const pd=document.getElementById('potDisplay');
+  const cd=document.getElementById('callDisplay');
+  if(pd)pd.textContent=money(Math.round(pot*100)/100);
+  if(cd)cd.textContent=money(Math.round(toCall*100)/100);
+  lastPot=Math.round(pot);
+  lastHeroBet=Math.round(state.heroBet||0);
+  updateOutcomeButtons();
+  updateUnmatchedUI();
+  if(typeof lastEquity!=='undefined'&&lastEquity!=null)computeDecision();
+}
+let lastPot=0,lastHeroBet=0;
+function updateOutcomeButtons(){
+  // выигрыш = весь банк минус своё вложение (чистая прибыль) ; проигрыш = своё вложение
+  const profit=Math.max(0,lastPot-lastHeroBet);
+  const wa=document.getElementById('wonAmt');
+  const la=document.getElementById('lostAmt');
+  if(wa)wa.textContent=money(profit);
+  if(la)la.textContent=money(lastHeroBet);
+}
+function render(){renderHero();renderBoard();renderOpps();renderCardGrid();}
+
+// ---------- picker ----------
+// активная цель ввода: куда встанет следующая выбранная карта
+let activeTarget={type:'hero',i:0};
+function setActiveTarget(t){activeTarget=t;render();}
+// найти следующий пустой слот (hero -> board по текущей улице)
+function nextEmptyTarget(){
+  for(let i=0;i<2;i++) if(!state.hero[i]) return {type:'hero',i};
+  for(let i=0;i<state.streetN;i++) if(!state.board[i]) return {type:'board',i};
+  return null;
+}
+function openPicker(target){ setActiveTarget(target); }  // клик по слоту = сделать его активным
+
+function setCard(code){
+  const t=activeTarget;
+  if(!t) return;
+  if(t.type==='hero')state.hero[t.i]=code; else state.board[t.i]=code;
+  // активная цель переходит на следующий пустой слот
+  const nxt=nextEmptyTarget();
+  if(nxt)activeTarget=nxt;
+  render();
+  autoCalc();           // мгновенный пересчёт
+}
+function clearTarget(t){
+  if(t.type==='hero')state.hero[t.i]=null; else state.board[t.i]=null;
+  activeTarget=t;
+  render();autoCalc();
+}
+// сетка всех 52 карт под панелью
+function renderCardGrid(){
+  const box=document.getElementById('cardGrid');
+  if(!box)return;
+  box.innerHTML='';
+  const used=usedCards(null);
+  SUITS.forEach(suit=>{
+    const row=document.createElement('div');row.className='grid-suit-row';
+    RANKS.forEach(r=>{
+      const code=r+suit.s;
+      const c=document.createElement('div');
+      c.className='gc '+suit.c+(used.has(code)?' used':'');
+      c.textContent=(r==='T'?'10':r)+suit.sym;
+      c.onclick=()=>{ if(!used.has(code)) setCard(code); };
+      row.appendChild(c);
+    });
+    box.appendChild(row);
+  });
+}
+// авторасчёт: считает сразу, если заданы обе карты hero и борд валиден
+let autoTimer=null;
+function autoCalc(){
+  clearTimeout(autoTimer);
+  autoTimer=setTimeout(()=>{
+    if(!state.hero[0]||!state.hero[1])return;
+    const filled=state.board.slice(0,state.streetN).filter(c=>c).length;
+    if(filled!==state.streetN)return;
+    runCalc();
+  },120);
+}
+function closePicker(){}
+
+document.getElementById('clearBtn').onclick=()=>{
+  state.hero=[null,null];state.board=[null,null,null,null,null];state.streetN=0;
+  state.opps.forEach(o=>{o.status='live';o.bet=0;});
+  state.heroBet=0;state.heroStatus='live';betOverride=null;
+  document.getElementById('heroBet').value=0;
+  document.querySelectorAll('.street-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.street-tab[data-n="0"]').classList.add('active');
+  render();recalcPot();
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('decision').classList.remove('show');
+  const ph=document.getElementById('placeholder');if(ph)ph.style.display='block';
+  const ok=document.getElementById('calcOk');if(ok)ok.textContent='';
+  lastEquity=null;
+};
+
+// ---------- hand evaluator (7 cards -> best 5) — проверено 10/10 тестов ----------
+function evaluate7(cards){
+  const ranks=cards.map(c=>RVAL[c[0]]);
+  const suits=cards.map(c=>c[1]);
+  const rcount={};ranks.forEach(r=>rcount[r]=(rcount[r]||0)+1);
+  const scount={};suits.forEach((s,i)=>{(scount[s]=scount[s]||[]).push(ranks[i]);});
+  let flushSuit=null;
+  for(const s in scount) if(scount[s].length>=5) flushSuit=s;
+  function straightHigh(rset){
+    const u=[...new Set(rset)].sort((a,b)=>b-a);
+    if(u.includes(14)) u.push(1);
+    let run=1;
+    for(let i=0;i<u.length-1;i++){
+      if(u[i]-1===u[i+1]){run++; if(run>=5) return u[i+1]+4;}
+      else run=1;
+    }
+    return 0;
+  }
+  if(flushSuit){const sf=straightHigh(scount[flushSuit]);if(sf) return [8,sf];}
+  const byCount=Object.entries(rcount).map(([r,c])=>[+r,c]);
+  byCount.sort((a,b)=> b[1]-a[1] || b[0]-a[0]);
+  const quads=byCount.filter(x=>x[1]===4).map(x=>x[0]);
+  const trips=byCount.filter(x=>x[1]===3).map(x=>x[0]);
+  const pairs=byCount.filter(x=>x[1]===2).map(x=>x[0]);
+  const singles=byCount.filter(x=>x[1]===1).map(x=>x[0]);
+  if(quads.length){const kick=Math.max(...ranks.filter(r=>r!==quads[0]));return [7,quads[0],kick];}
+  if(trips.length>=1 && (pairs.length>=1 || trips.length>=2)){
+    const three=trips[0];
+    const pairCand=trips.length>=2?Math.max(...trips.slice(1),...pairs):Math.max(...pairs);
+    return [6,three,pairCand];
+  }
+  if(flushSuit){const top5=[...scount[flushSuit]].sort((a,b)=>b-a).slice(0,5);return [5,...top5];}
+  const st=straightHigh(ranks);
+  if(st) return [4,st];
+  if(trips.length){const ks=singles.slice(0,2);return [3,trips[0],...ks];}
+  if(pairs.length>=2){const[ph,pl]=[pairs[0],pairs[1]];const kick=Math.max(...ranks.filter(r=>r!==ph&&r!==pl));return [2,ph,pl,kick];}
+  if(pairs.length===1){const ks=singles.slice(0,3);return [1,pairs[0],...ks];}
+  return [0,...singles.slice(0,5)];
+}
+function cmp(a,b){for(let i=0;i<Math.max(a.length,b.length);i++){const x=a[i]||0,y=b[i]||0;if(x!==y)return x-y;}return 0;}
+const HAND_NAMES=['старшая карта','пара','две пары','сет','стрит','флеш','фулл-хаус','каре','стрит-флеш'];
+
+// ---------- модель силы стартовой руки (0..100) ----------
+// откалибрована так, чтобы AA≈100, а проценты рук соответствовали реальным диапазонам
+function handStrength(c1,c2){
+  const r1=RVAL[c1[0]], r2=RVAL[c2[0]];
+  const hi=Math.max(r1,r2), lo=Math.min(r1,r2);
+  const pair=(r1===r2);
+  const suited=(c1[1]===c2[1]);
+  const gap=hi-lo;
+  let s;
+  if(pair){
+    // пары: 22≈52, AA≈100, рост ~4 за ранг
+    s = 50 + (r1-2)*4.2;          // 22->50, AA(14)->100.4
+  } else {
+    // непарные: база от суммы старшей и младшей
+    s = 18 + (hi-2)*3.4 + (lo-2)*1.6;
+    // штраф за разрыв
+    if(gap===2) s-=2; else if(gap===3) s-=4; else if(gap>=4) s-=6;
+    // бонус коннекторам
+    if(gap===1) s+=3;
+  }
+  if(suited) s+=5;
+  return Math.max(0,Math.min(100,s));
+}
+// пороги по тайтовости (state.tightness 0..100). При t=50: рейз≈топ-14%, колл≈топ-38%.
+function rangeThresholds(){
+  const t=state.tightness;
+  const raise = 70 + (t-50)*0.18;   // t=0->61, 50->70, 100->79
+  const call  = 58 + (t-50)*0.16;   // t=0->50, 50->58, 100->66
+  return {raise,call};
+}
+// позиционный сдвиг порога: ранняя позиция -> диапазон уже (выше порог), поздняя -> шире
+function posAdjust(pos){
+  return {utg:8, mp:4, co:0, btn:-4, sb:2, bb:-2}[pos]||0;
+}
+function inRaiseRange(c1,c2,pos){return handStrength(c1,c2)>=rangeThresholds().raise+posAdjust(pos);}
+function inCallRange(c1,c2,pos){return handStrength(c1,c2)>=rangeThresholds().call+posAdjust(pos);}
+function fullDeck(){const d=[];RANKS.forEach(r=>SUITS.forEach(s=>d.push(r+s.s)));return d;}
+function activeOpps(){
+  // активные соперники: {status, pos}, исключая fold
+  return state.opps.filter(o=>o.status!=='fold').map(o=>({status:o.status,pos:o.pos}));
+}
+function simulate(iters){
+  const knownBoard=state.board.slice(0,state.streetN).filter(c=>c);
+  const used=new Set();
+  state.hero.forEach(c=>c&&used.add(c));
+  knownBoard.forEach(c=>used.add(c));
+  const opps=activeOpps();           // [{status,pos}] активных соперников
+  const raisers=opps.filter(o=>o.status==='raise').length;
+  let win=0,tie=0;
+  const heroCards=state.hero;
+  for(let it=0;it<iters;it++){
+    const deck=fullDeck().filter(c=>!used.has(c));
+    // перемешанный список индексов колоды
+    const idx=deck.map((_,i)=>i);
+    for(let i=idx.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[idx[i],idx[j]]=[idx[j],idx[i]];}
+    let ptr=0;
+    const oppHands=[];
+    let okDeal=true;
+    for(const o of opps){
+      const st=o.status;
+      if(st==='raise'||st==='call'){
+        // отбор по диапазону с учётом позиции соперника
+        let found=null;
+        for(let t=ptr;t<idx.length-1 && !found;t++){
+          for(let u=t+1;u<idx.length;u++){
+            const inRange = st==='raise'
+              ? inRaiseRange(deck[idx[t]],deck[idx[u]],o.pos)
+              : inCallRange(deck[idx[t]],deck[idx[u]],o.pos);
+            if(inRange){found=[t,u];break;}
+          }
+        }
+        if(!found){okDeal=false;break;}
+        oppHands.push([deck[idx[found[0]]],deck[idx[found[1]]]]);
+        idx.splice(found[1],1);idx.splice(found[0],1);
+      } else {
+        if(idx.length-ptr<2){okDeal=false;break;}
+        oppHands.push([deck[idx[ptr]],deck[idx[ptr+1]]]);
+        ptr+=2;
+      }
+    }
+    if(!okDeal){continue;}
+    const board=[...knownBoard];
+    let bp=ptr;
+    while(board.length<5){board.push(deck[idx[bp++]]);}
+    const heroScore=evaluate7([...heroCards,...board]);
+    let bestOpp=null;
+    for(const oh of oppHands){
+      const s=evaluate7([...oh,...board]);
+      if(bestOpp===null||cmp(s,bestOpp)>0) bestOpp=s;
+    }
+    if(bestOpp===null){win++;continue;}
+    const c=cmp(heroScore,bestOpp);
+    if(c>0)win++; else if(c===0)tie++;
+  }
+  return {win,tie,iters,raisers,callers:opps.filter(o=>o.status==='call').length,activeCount:opps.length};
+}
+
+// текущая комбинация героя (для подсказки силы)
+function heroMadeHand(){
+  const known=state.board.slice(0,state.streetN).filter(c=>c);
+  const cards=[...state.hero.filter(c=>c),...known];
+  if(cards.length<5) return null;
+  const sc=evaluate7(cards);
+  return HAND_NAMES[sc[0]];
+}
+
+// аутсы: карты, дающие СИЛЬНОЕ улучшение (стрит и выше), плюс отдельно учёт пар-в-сет
+function analyzeOuts(){
+  const known=state.board.slice(0,state.streetN).filter(c=>c);
+  const hero=state.hero.filter(c=>c);
+  if(hero.length<2||known.length<3||known.length>=5) return null; // только флоп/тёрн
+  const cur=evaluate7([...hero,...known]);
+  const used=new Set([...hero,...known]);
+  const deck=fullDeck().filter(c=>!used.has(c));
+  const remaining=deck.length;
+  // порог значимости: если у нас уже пара+ — считаем улучшения выше текущей категории;
+  // если старшая/слабая пара — считаем только дро до стрита(4)+ как "сильные аутсы"
+  const strongThreshold = Math.max(cur[0]+1, 3); // не ниже сета как цели для дро-рук
+  let outs=0; const improvedTo={};
+  for(const card of deck){
+    const sc=evaluate7([...hero,...known,card]);
+    let significant=false;
+    if(cur[0]>=1){               // уже есть пара или лучше → любое повышение категории значимо
+      significant = sc[0]>cur[0];
+    } else {                     // старшая карта → значимы только стрит(4)/флеш(5)+ (дро), не просто пара
+      significant = sc[0]>=4;
+    }
+    if(significant){
+      outs++;
+      const name=HAND_NAMES[sc[0]];
+      improvedTo[name]=(improvedTo[name]||0)+1;
+    }
+  }
+  const oneCard=outs/remaining*100;
+  let twoCard=null;
+  if(known.length===3&&outs>0){
+    twoCard=(1-((remaining-outs)/remaining)*((remaining-1-outs)/(remaining-1)))*100;
+  }
+  return {outs,oneCard,twoCard,improvedTo,curCat:cur[0]};
+}
+
+// постфлоп-секция: что собрано, дро/аутсы, стоит ли продолжать
+function renderPostflop(activeCount){
+  const box=document.getElementById('preflopBox');
+  if(!box)return;
+  if(state.streetN<3){return;}  // префлоп обрабатывается отдельно
+  box.style.display='block';
+  const made=heroMadeHand()||'старшая карта';
+  const eq=lastEquity||0;
+  const streetName=['','','','флоп','тёрн','ривер'][state.streetN];
+
+  // вердикт по equity
+  let verdict,vcls,advice;
+  if(eq>=66){verdict='ПРОДОЛЖАТЬ — ставить/рейзить';vcls='call';advice='Сильное преимущество. Ставь ради вэлью, на агрессию отвечай рейзом.';}
+  else if(eq>=50){verdict='ПРОДОЛЖАТЬ';vcls='call';advice='Ты впереди. Ставь вэлью, но осторожно с крупной переставкой.';}
+  else if(eq>=38){verdict='ОСТОРОЖНО — по цене банка';vcls='warn';advice='Рука примерно равная или с дро. Контролируй банк, коллируй только по хорошей цене.';}
+  else {verdict='СКОРЕЕ СБРОСИТЬ';vcls='fold';advice='Ты позади. Без сильного дро или хорошей цены — фолд на ставку.';}
+
+  let html=`<div class="pf-verdict ${vcls}">${verdict}</div>
+    <div class="pf-row">Улица: <b>${streetName}</b> · собрано: <b>${made}</b> · твой шанс <b>${eq.toFixed(1)}%</b></div>
+    <div class="pf-row pf-advice">${advice}</div>`;
+
+  // дро и аутсы (только флоп/тёрн)
+  const draws=analyzeOuts();
+  if(draws&&draws.outs>0){
+    const parts=Object.entries(draws.improvedTo).map(([n,c])=>`${n} (${c})`);
+    html+=`<div class="pf-row"><span class="pf-lbl">дро — аутов: ${draws.outs}</span></div>
+      <ul class="pf-outs">
+        <li>улучшение до: ${parts.join(', ')}</li>
+        <li>поймать на ${state.streetN===3?'тёрне':'ривере'}: ≈${draws.oneCard.toFixed(0)}%</li>
+        ${draws.twoCard!=null?`<li>поймать к риверу (2 карты): ≈${draws.twoCard.toFixed(0)}%</li>`:''}
+      </ul>`;
+  } else if(draws){
+    html+=`<div class="pf-row" style="opacity:.7">прямых улучшений категории нет — играешь силу текущей руки</div>`;
+  } else if(state.streetN===5){
+    html+=`<div class="pf-row" style="opacity:.7">ривер — добора больше нет, играешь что собрано</div>`;
+  }
+  html+=`<div class="pf-foot">против ${activeCount} активн. · equity ${eq.toFixed(1)}%</div>`;
+  box.innerHTML=html;
+}
+
+// ---------- run ----------
+const calcBtn=document.getElementById('calcBtn');
+function runCalc(){
+  const err=document.getElementById('err');err.textContent='';
+  const calcOk=document.getElementById('calcOk');if(calcOk)calcOk.textContent='';
+  if(!state.hero[0]||!state.hero[1]){err.textContent='укажи обе свои карты.';return;}
+  const filled=state.board.slice(0,state.streetN).filter(c=>c).length;
+  if(filled!==state.streetN){err.textContent='заполни все открытые общие карты.';return;}
+  const iters=+document.getElementById('iters').value;
+  calcBtn.disabled=true;calcBtn.textContent='считаю…';
+  setTimeout(()=>{
+    const t0=performance.now();
+    const ex=tryExact();
+    let sim,exact=false;
+    if(ex){sim=ex;exact=true;} else {sim=simulate(iters);}
+    const ms=Math.round(performance.now()-t0);
+    showEquity(sim.win,sim.tie,sim.iters,ms,sim.activeCount,sim.raisers,sim.callers,exact);
+    calcBtn.disabled=false;calcBtn.textContent='рассчитать';
+  },30);
+}
+calcBtn.onclick=runCalc;
+
+// точный перебор: применим когда борд=ривер(5) и активные соперники все "любая рука".
+// перебираем все сочетания рук соперников из оставшейся колоды. Без приближения.
+function tryExact(){
+  if(state.streetN!==5) return null;                 // только полный борд
+  const opps=activeOpps();
+  if(opps.some(o=>o.status==='raise'||o.status==='call')) return null; // диапазоны не перебираем точно
+  const nOpp=opps.length;
+  const knownBoard=state.board.slice(0,5);
+  const used=new Set([...state.hero,...knownBoard]);
+  const deck=fullDeck().filter(c=>!used.has(c));     // ~45 карт
+  // оценка числа сочетаний: C(45,2)^nOpp. Лимит разумности.
+  const c2=deck.length*(deck.length-1)/2;
+  let combos=1; for(let k=0;k<nOpp;k++) combos*=c2;
+  if(nOpp===0) { // никого нет — победа 100%
+    return {win:1,tie:0,iters:1,activeCount:0,raisers:0,callers:0};
+  }
+  if(nOpp>2 || (nOpp===2 && c2*c2>3_000_000)) return null; // слишком много — Монте-Карло
+  const heroScore=evaluate7([...state.hero,...knownBoard]);
+  // предрасчёт всех рук соперника и их силы
+  const hands=[];
+  for(let i=0;i<deck.length;i++)for(let j=i+1;j<deck.length;j++){
+    hands.push([deck[i],deck[j],evaluate7([deck[i],deck[j],...knownBoard])]);
+  }
+  let win=0,tie=0,total=0;
+  if(nOpp===1){
+    for(const h of hands){
+      total++;
+      const c=cmp(heroScore,h[2]);
+      if(c>0)win++; else if(c===0)tie++;
+    }
+  } else { // nOpp===2
+    for(let a=0;a<hands.length;a++){
+      const ha=hands[a];
+      for(let b=a+1;b<hands.length;b++){
+        const hb=hands[b];
+        // карты не должны пересекаться
+        if(ha[0]===hb[0]||ha[0]===hb[1]||ha[1]===hb[0]||ha[1]===hb[1])continue;
+        total++;
+        const best = cmp(ha[2],hb[2])>=0?ha[2]:hb[2];
+        const c=cmp(heroScore,best);
+        if(c>0)win++; else if(c===0)tie++;
+      }
+    }
+  }
+  return {win,tie,iters:total,activeCount:nOpp,raisers:0,callers:0};
+}
+
+let lastEquity=null;
+let betOverride=null;   // ставка к коллу, форсированная олл-ином (сбрасывается при изменении вложений)
+function winZone(pct){
+  if(pct>=70) return {cls:'z-dom',   label:'ДОМИНИРУЕШЬ'};
+  if(pct>=55) return {cls:'z-ahead', label:'ТЫ ВПЕРЕДИ'};
+  if(pct>=45) return {cls:'z-even',  label:'ПРИМЕРНО РАВНО'};
+  if(pct>=30) return {cls:'z-behind',label:'ТЫ СЛАБЕЕ'};
+  return            {cls:'z-weak',  label:'ОЧЕНЬ СЛАБО'};
+}
+function showEquity(win,tie,iters,ms,activeCount,raisers,callers,exact){
+  const winPct=win/iters*100;
+  const tiePct=tie/iters*100;
+  const equity=winPct+tiePct/2;      // доля банка: победа + половина ничьих (упрощённо для героя)
+  const losePct=100-winPct-tiePct;
+  lastEquity=equity;
+
+  document.getElementById('winNum').textContent=winPct.toFixed(1)+'%';
+  document.getElementById('winSub').textContent=tiePct>=0.1?`+ ничья ${tiePct.toFixed(1)}%`:'чистая победа';
+  document.getElementById('loseNum').textContent=losePct.toFixed(1)+'%';
+
+  // --- цветовая зона по шансу выигрыша ---
+  const z=winZone(winPct);
+  const winCard=document.getElementById('winNum').closest('.eq-card');
+  winCard.className='eq-card win '+z.cls;
+  const banner=document.getElementById('zoneBanner');
+  banner.style.display='block';
+  banner.className='zone-banner '+z.cls;
+  banner.textContent=`${z.label} — шанс выиграть ${winPct.toFixed(1)}%`;
+
+  const bar=document.getElementById('eqBar');
+  bar.className='bar-fill '+z.cls;
+  bar.style.width='0%';
+  requestAnimationFrame(()=>{bar.style.width=equity+'%';bar.textContent=equity.toFixed(0)+'%';});
+  const parts=[];
+  if(raisers>0)parts.push(`${raisers} рейз`);
+  if(callers>0)parts.push(`${callers} колл`);
+  const rzTxt=parts.length?` · ${parts.join(', ')} (узкий диапазон)`:'';
+  const method = exact ? `точный перебор (${iters.toLocaleString('ru')} вариантов, погрешность 0)` : `${iters.toLocaleString('ru')} симуляций`;
+  document.getElementById('resMeta').textContent=`против ${activeCount} активных${rzTxt} · ${method} · ${ms} мс`;
+
+  // сила руки
+  const made=heroMadeHand();
+  const sb=document.getElementById('strengthBox');
+  const heroTxt=`${cardLabel(state.hero[0])} ${cardLabel(state.hero[1])}`;
+  const street=['префлоп','—','—','флоп','тёрн','ривер'][state.streetN]||'';
+  sb.innerHTML=`<h4>что у тебя сейчас</h4>
+    <div>Рука: <span class="tag">${heroTxt}</span> ${made?`· собрано: <span class="tag">${made}</span>`:`· улица: <span class="tag">${street}</span> (комбинация соберётся на борде)`}</div>
+    <div style="margin-top:6px">Equity <span class="tag">${equity.toFixed(1)}%</span> против ${activeCount} активн.${raisers>0?` (${raisers} с сильным диапазоном)`:''}</div>`;
+
+  if(state.streetN===0) renderPreflop(activeCount);
+  else renderPostflop(activeCount);
+  document.getElementById('result').classList.add('show');
+  const ph=document.getElementById('placeholder');if(ph)ph.style.display='none';
+  const ok=document.getElementById('calcOk');if(ok)ok.textContent='рассчитано';
+  computeDecision();
+}
+
+// ---------- префлоп-секция: стоит ли заходить, почему, перспективы ----------
+function renderPreflop(activeCount){
+  const box=document.getElementById('preflopBox');
+  if(!box)return;
+  // показываем только на префлопе (борда нет)
+  if(state.streetN!==0){box.style.display='none';return;}
+  const c1=state.hero[0],c2=state.hero[1];
+  if(!c1||!c2){box.style.display='none';return;}
+
+  const r1=RVAL[c1[0]],r2=RVAL[c2[0]];
+  const hi=Math.max(r1,r2),lo=Math.min(r1,r2);
+  const pair=(r1===r2),suited=(c1[1]===c2[1]),gap=hi-lo;
+  const strength=handStrength(c1,c2);  // 0..100
+  const NM={2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
+
+  // тип руки и описание
+  let type,why;
+  if(pair&&hi>=13){type='премиум-пара';why='одна из сильнейших стартовых рук, уже готовая комбинация';}
+  else if(pair&&hi>=10){type='высокая пара';why='сильная готовая рука, чаще всего лучшая до флопа';}
+  else if(pair&&hi>=7){type='средняя пара';why='хорошая рука, но осторожно с высокими картами на борде';}
+  else if(pair){type='малая пара';why='ценность в основном в попадании в сет (тройку) на флопе';}
+  else if(hi===14&&lo>=12){type='сильный туз';why='доминирует много других тузов, хорошо и для пары, и для топ-кикера';}
+  else if(hi===14&&suited){type='одномастный туз';why='туз даёт топ-пару, одна масть — натсовое флеш-дро';}
+  else if(hi>=13&&lo>=11){type='бродвей';why='две высокие карты, дают топ-пары и стриты';}
+  else if(suited&&gap<=2&&lo>=6){type='одномастный коннектор';why='скрытая сила: ловит стриты и флеши, хорош в мультипоте';}
+  else if(hi===14){type='слабый туз';why='туз есть, но кикер низкий — легко доминируется лучшим тузом';}
+  else if(strength>=45){type='играбельная рука';why='средняя по силе, играть осторожно и по позиции';}
+  else {type='слабая рука';why='редко выигрывает без удачного флопа, чаще приносит убыток';}
+
+  // вердикт по силе + позиции + числу соперников
+  const posAdj={utg:-15,mp:-7,co:0,btn:8,blinds:-5}[state.position]||0;
+  const posName={utg:'ранней (UTG)',mp:'средней',co:'катоффа',btn:'баттона',blinds:'блайндов'}[state.position]||'';
+  const effStrength=Math.max(0,Math.min(100,strength+posAdj));
+  let verdict,vcls,vadvice;
+  const manyOpp=activeCount>=4;
+  const posNote=` С ${posName} позиции${posAdj>0?' диапазон шире':posAdj<0?' играй строже':''}.`;
+  if(effStrength>=62){verdict='СТОИТ заходить — рейзить';vcls='call';
+    vadvice='Сильная рука, заходи агрессивно (рейз). Цель — сузить поле и набить банк.'+posNote;}
+  else if(effStrength>=50){verdict='СТОИТ заходить';vcls='call';
+    vadvice=(manyOpp?'Достойная рука, но игроков много — заходи осторожно.':'Хорошая рука, можно открывать рейзом.')+posNote;}
+  else if(effStrength>=40){verdict=manyOpp?'ОСТОРОЖНО / лучше пас':'МОЖНО зайти дёшево';vcls='warn';
+    vadvice=(manyOpp?`Против ${activeCount} соперников рука слабовата.`:'Играбельно за дёшево.')+posNote;}
+  else {verdict='НЕ СТОИТ — фолд';vcls='fold';
+    vadvice='Слабая для этой позиции рука. В долгую заход с такими руками сливает банкролл.'+posNote;}
+
+  // перспективы улучшения (грубые, известные покерные числа)
+  const outs=[];
+  if(pair) outs.push('сет (тройка) на флопе — ≈12%','каре/фулл-хаус — редко, но возможно');
+  else {
+    outs.push(`топ-пара на флопе — ≈${suited?'32':'29'}%`);
+    if(suited) outs.push('флеш-дро на флопе — ≈11%, добор флеша — ≈35% к риверу');
+    if(gap<=1&&!pair) outs.push('стрит-дро на флопе — ≈10%');
+  }
+
+  box.style.display='block';
+  box.innerHTML=`
+    <div class="pf-verdict ${vcls}">${verdict}</div>
+    <div class="pf-row"><b>${NM[hi]}${pair?NM[lo]:NM[lo]}${suited?' одномастные':pair?'':' разномастные'}</b> — ${type}. ${why}.</div>
+    <div class="pf-row pf-advice">${vadvice}</div>
+    <div class="pf-row"><span class="pf-lbl">на что может улучшиться:</span></div>
+    <ul class="pf-outs">${outs.map(o=>`<li>${o}</li>`).join('')}</ul>
+    <div class="pf-foot">сила руки: <span class="tag">${Math.round(strength)}/100</span> · против ${activeCount} активн. твой шанс ${lastEquity?lastEquity.toFixed(1):'—'}%</div>`;
+}
+
+// ---------- decision: pot odds / EV / рекомендация ----------
+function computeDecision(){
+  if(lastEquity==null){document.getElementById('decision').classList.remove('show');return;}
+  const pot=parseFloat(document.getElementById('potSize').value);
+  let bet=betOverride!=null?betOverride:parseFloat(document.getElementById('betSize').value);
+  const stack=parseFloat(document.getElementById('stackSize').value);
+  if(isNaN(pot)||isNaN(bet)||pot<0||bet<0){document.getElementById('decision').classList.remove('show');return;}
+  // ты не можешь вложить в колл больше своего стека
+  let callAmt=bet;
+  let capped=false;
+  if(!isNaN(stack)&&stack>=0&&bet>stack){callAmt=stack;capped=true;}
+  const isAllin=!isNaN(stack)&&stack>0&&callAmt>=stack;
+  const eqPct=lastEquity;
+  const eq=eqPct/100;
+  const requiredEq=callAmt>0?callAmt/(pot+callAmt):0;
+  const evCall=eq*pot-(1-eq)*callAmt;
+  const potBeforeBet=pot-bet;
+  const mdf=potBeforeBet>0?potBeforeBet/(potBeforeBet+bet):(pot>0?pot/(pot+bet):0);
+  const fmt=x=>(Math.round(x*10)/10);
+
+  document.getElementById('metrics').innerHTML=`
+    <div class="metric"><div class="ml">твой шанс выиграть</div><div class="mv">${fmt(eqPct)}%</div><div class="md">доля банка в среднем</div></div>
+    <div class="metric"><div class="ml">нужно для колла</div><div class="mv">${fmt(requiredEq*100)}%</div><div class="md">порог, выше которого колл в плюс</div></div>
+    <div class="metric"><div class="ml">цена колла</div><div class="mv">${fmt(callAmt)} : ${fmt(pot)}</div><div class="md">платишь ${fmt(callAmt)}${capped?' (весь стек)':''}, выигрываешь ${fmt(pot)}</div></div>
+    <div class="metric"><div class="ml">EV колла</div><div class="mv">${evCall>=0?'+':''}${fmt(evCall)}</div><div class="md">${isAllin?'олл-ин: рискуешь всем стеком':'средний результат в фишках (фолд=0)'}</div></div>
+    <div class="metric"><div class="ml">MDF</div><div class="mv">${fmt(mdf*100)}%</div><div class="md">сколько рук защищать от ставки</div></div>`;
+
+  const isCall=evCall>0;
+  const margin=eqPct-requiredEq*100;
+  const verdict=document.getElementById('verdict');
+  verdict.className='verdict '+(isCall?'call':'fold');
+  verdict.innerHTML=isCall
+    ? `КОЛЛ выгоден математически<div class="vsub">Твой шанс ${fmt(eqPct)}% выше порога ${fmt(requiredEq*100)}% на ${fmt(margin)} п.п. · в среднем колл приносит ${evCall>=0?'+':''}${fmt(evCall)} фишек за раздачу.</div>`
+    : `ФОЛД — колл в минус<div class="vsub">Твой шанс ${fmt(eqPct)}% ниже порога ${fmt(requiredEq*100)}% на ${fmt(Math.abs(margin))} п.п. · колл в среднем теряет ${fmt(evCall)} фишек.</div>`;
+
+  renderActions(eqPct,isCall,evCall,fmt);
+  renderCombos();
+  document.getElementById('decision').classList.add('show');
+}
+
+function renderActions(eqPct,isCall,evCall,fmt){
+  let box=document.getElementById('actionsBox');
+  let head,desc,cls;
+  if(eqPct>=70){cls='call';head='СТАВИТЬ / РЕЙЗИТЬ — играть на банк';desc='Очень сильная рука (выигрыш '+fmt(eqPct)+'%). Цель — набить банк: ставь сам, на ставку отвечай рейзом. Чек тут теряет деньги.';}
+  else if(eqPct>=55){cls='call';head='СТАВИТЬ (вэлью), но без рейз-войны';desc='Рука впереди ('+fmt(eqPct)+'%). Ставь ради вэлью — тебя коллируют более слабые руки. Если соперник сам рейзит, чаще просто колл.';}
+  else if(eqPct>=45){cls='warn';head='ЧЕК / КОЛЛ — контроль банка';desc='Примерно равная рука ('+fmt(eqPct)+'%). Не раздувай банк: чекни бесплатно, коллируй умеренные ставки. Большой рейз без причины невыгоден.';}
+  else if(eqPct>=30){cls=isCall?'call':'warn';head=isCall?'КОЛЛ по цене банка — сам не ставь':'ЧЕК или ФОЛД';desc='Рука слабовата ('+fmt(eqPct)+'%), '+(isCall?'но цена банка делает колл выгодным. Ставку используй только как блеф.':'и цена не оправдывает колл. Чекни, если бесплатно; на ставку — фолд.');}
+  else {cls='fold';head='ФОЛД (или дешёвый чек)';desc='Слабая рука ('+fmt(eqPct)+'%). Вкладывать фишки невыгодно. Чекни, если можно увидеть следующую карту бесплатно, иначе сбрасывай.';}
+  const html=`
+    <div class="verdict ${cls}" style="margin-top:4px">${head}<div class="vsub">${desc}</div></div>
+    <div class="combos" style="margin-top:8px"><span class="tag">КОЛЛ/ФОЛД</span> точная математика · <span class="tag">ЧЕК/СТАВКА/РЕЙЗ</span> оценка по силе руки (живого соперника не предсказать)</div>`;
+  if(!box){box=document.createElement('div');box.id='actionsBox';const v=document.getElementById('verdict');v.parentNode.insertBefore(box,v.nextSibling);}
+  box.innerHTML=html;
+}
+
+function renderCombos(){
+  const box=document.getElementById('combosBox');
+  const seen=usedCards(null);
+  const left={};RANKS.forEach(r=>left[r]=4);
+  seen.forEach(c=>{left[c[0]]--;});
+  let tags='';
+  ['A','K','Q','J'].forEach(r=>{const n=left[r];const pairs=n*(n-1)/2;tags+=`<span class="tag">${r}${r}:${pairs}</span>`;});
+  box.innerHTML=`<h4>комбо соперников</h4><div>осталось в колоде: ${tags} <span style="opacity:.6">· пара=6, непарка=16, одномастная=4 комбо до раздачи</span></div>`;
+}
+
+document.getElementById('stackSize').addEventListener('input',()=>{if(lastEquity!=null)computeDecision();});
+document.getElementById('heroBet').addEventListener('input',e=>{state.heroBet=parseFloat(e.target.value)||0;renderOpps();recalcPot();});
+const _ab=document.getElementById('allinBtn');
+if(_ab)_ab.onclick=()=>{
+  const stack=parseFloat(document.getElementById('stackSize').value)||0;
+  document.getElementById('betSize').value=stack;
+  betOverride=stack;
+  if(lastEquity!=null)computeDecision();
+};
+
+const tightLabels=[[0,'очень лузовый'],[20,'лузовый'],[40,'средний'],[60,'тайтоватый'],[80,'тайтовый'],[100,'очень тайтовый']];
+function tightName(v){let n='средний';for(const[th,name]of tightLabels)if(v>=th)n=name;return n;}
+document.getElementById('tightness').addEventListener('input',e=>{
+  state.tightness=+e.target.value;
+  document.getElementById('tightLabel').textContent=tightName(state.tightness);
+});
+
+// блайнды и валюта
+document.getElementById('blinds').addEventListener('change',e=>{
+  const [sb,bb]=e.target.value.split('/').map(Number);
+  state.sb=sb;state.bb=bb;
+  recalcPot();renderSession();updateOutcomeButtons();
+});
+document.getElementById('currency').addEventListener('change',e=>{
+  state.cur=e.target.value;
+  recalcPot();renderSession();updateOutcomeButtons();
+});
+
+// выбор позиции
+const posHints={
+  utg:'ранняя — играй строго',
+  mp:'средняя — умеренно',
+  co:'катофф — шире',
+  btn:'баттон — играй шире',
+  blinds:'блайнды — без позиции'
+};
+document.getElementById('posBtns').querySelectorAll('.pos-btn-h').forEach(btn=>{
+  btn.onclick=()=>{
+    state.position=btn.dataset.pos;
+    document.querySelectorAll('.pos-btn-h').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('posHint').textContent=posHints[state.position]||'';
+    if(lastEquity!=null&&state.streetN===0) renderPreflop(activeOpps().length);
+  };
+});
+
+// ---------- статистика сессии ----------
+const S=state.session;
+function money(n){
+  // дробные блайнды -> 2 знака, целые -> без дробей
+  const frac = (state.bb<1) ? 2 : 0;
+  const num = Number(n).toLocaleString('ru',{minimumFractionDigits:frac,maximumFractionDigits:frac});
+  return state.cur ? state.cur+num : num;
+}
+function fmtTime(sec){
+  const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=Math.floor(sec%60);
+  const p=n=>String(n).padStart(2,'0');
+  return `${p(h)}:${p(m)}:${p(s)}`;
+}
+function renderSession(){
+  const bv=document.getElementById('balanceVal');
+  if(bv){bv.textContent=(S.balance>=0?'+':'−')+money(Math.abs(S.balance));
+    bv.className='sbox-val '+(S.balance>0?'pos':S.balance<0?'neg':'');}
+  const tv=document.getElementById('timerVal'); if(tv)tv.textContent=fmtTime(S.elapsed);
+  const tval=document.getElementById('tablesVal'); if(tval)tval.textContent=S.tables;
+  const hval=document.getElementById('handsVal'); if(hval)hval.textContent=S.hands;
+  // винрейт: рук в час
+  const hr=document.getElementById('handsRate');
+  if(hr){
+    if(S.elapsed>0&&S.hands>0){
+      const handsPerHour=S.hands/(S.elapsed/3600);
+      hr.textContent=`${Math.round(handsPerHour)} рук/час`;
+    } else hr.textContent='—';
+  }
+  // доход в час и BB/100
+  const hv=document.getElementById('hourlyVal');
+  const bb100=document.getElementById('bbHundred');
+  if(hv){
+    if(S.elapsed>0){
+      const perHour=S.balance/(S.elapsed/3600);
+      hv.textContent=(perHour>=0?'+':'−')+money(Math.abs(Math.round(perHour)));
+      hv.className='sbox-val '+(perHour>0?'pos':perHour<0?'neg':'');
+    } else {hv.textContent='—';hv.className='sbox-val';}
+  }
+  if(bb100){
+    if(S.hands>0&&state.bb>0){
+      const bbWon=S.balance/state.bb;
+      const per100=bbWon/S.hands*100;
+      bb100.textContent=`${per100>=0?'+':''}${per100.toFixed(1)} BB/100`;
+    } else bb100.textContent='—';
+  }
+}
+let timerInt=null;
+function updateTimerBtns(){
+  const start=document.getElementById('timerStart');
+  const pause=document.getElementById('timerPause');
+  if(start)start.classList.toggle('on',S.running);
+  if(pause)pause.classList.toggle('on',!S.running&&S.elapsed>0);
+}
+function startTimer(){
+  if(S.running)return;
+  S.running=true;
+  timerInt=setInterval(()=>{S.elapsed++;const tv=document.getElementById('timerVal');if(tv)tv.textContent=fmtTime(S.elapsed);renderSession();},1000);
+  updateTimerBtns();
+}
+function pauseTimer(){
+  S.running=false;
+  if(timerInt){clearInterval(timerInt);timerInt=null;}
+  updateTimerBtns();
+}
+function stopTimer(){pauseTimer();S.elapsed=0;renderSession();updateTimerBtns();}
+const _ts=document.getElementById('timerStart'); if(_ts)_ts.onclick=startTimer;
+const _tp=document.getElementById('timerPause'); if(_tp)_tp.onclick=pauseTimer;
+const _tx=document.getElementById('timerStop'); if(_tx)_tx.onclick=stopTimer;
+const _tpl=document.getElementById('tablePlus'); if(_tpl)_tpl.onclick=()=>{S.tables++;renderSession();};
+function applyResult(sign){
+  const inp=document.getElementById('handResult');
+  if(!inp)return;
+  const v=Math.abs(parseFloat(inp.value));
+  if(isNaN(v)||v===0)return;
+  S.balance+=sign*v;S.hands++;inp.value='';renderSession();
+}
+const _aw=document.getElementById('addWin'); if(_aw)_aw.onclick=()=>applyResult(1);
+const _al=document.getElementById('addLose'); if(_al)_al.onclick=()=>applyResult(-1);
+const _af=document.getElementById('addFold'); if(_af)_af.onclick=()=>{S.hands++;const hr=document.getElementById('handResult');if(hr)hr.value='';renderSession();};
+
+// кнопки исхода в блоке результата — сумма берётся автоматически из банка
+document.getElementById('wonHand').onclick=()=>{
+  const profit=Math.max(0,lastPot-lastHeroBet);
+  S.balance+=profit;S.hands++;renderSession();flashOutcome('won');
+  endHand();
+};
+document.getElementById('lostHand').onclick=()=>{
+  S.balance-=lastHeroBet;S.hands++;renderSession();flashOutcome('lost');
+  endHand();
+};
+function flashOutcome(kind){
+  const hint=document.getElementById('outcomeHint');
+  if(!hint)return;
+  hint.textContent = kind==='won'
+    ? `+${money(Math.max(0,lastPot-lastHeroBet))} зачтено · раздача закрыта`
+    : `−${money(lastHeroBet)} зачтено · раздача закрыта`;
+  hint.style.color = kind==='won' ? 'var(--green)' : 'var(--red)';
+}
+// завершение раздачи: обнуляем вложения и статусы, готовим новую руку (баланс уже зачтён)
+function endHand(){
+  state.opps.forEach(o=>{o.status='live';o.bet=0;});
+  state.heroBet=0;state.heroStatus='live';betOverride=null;
+  const hb=document.getElementById('heroBet');if(hb)hb.value=0;
+  renderOpps();recalcPot();
+}
+
+renderSession();
+render();
+recalcPot();
+updateTimerBtns();
+</script>
+</body>
+</html>
