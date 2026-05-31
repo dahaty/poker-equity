@@ -383,6 +383,52 @@ async function sendToTelegram(text){
 }
 
 /* ============================================================
+   SOUND — синтез ретро-терминальных сигналов через Web Audio
+============================================================ */
+const SND=(function(){
+  let ctx=null;
+  function ac(){
+    if(!ctx){try{ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return null;}}
+    if(ctx.state==='suspended')ctx.resume();
+    return ctx;
+  }
+  function tone(freq,t0,dur,type,peak){
+    const c=ac();if(!c)return;
+    const o=c.createOscillator(),g=c.createGain();
+    o.type=type||'square';o.frequency.setValueAtTime(freq,t0);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(peak||0.12,t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    o.connect(g).connect(c.destination);
+    o.start(t0);o.stop(t0+dur+0.02);
+  }
+  function sweep(f1,f2,t0,dur,peak){
+    const c=ac();if(!c)return;
+    const o=c.createOscillator(),g=c.createGain();
+    o.type='sawtooth';
+    o.frequency.setValueAtTime(f1,t0);
+    o.frequency.exponentialRampToValueAtTime(f2,t0+dur);
+    g.gain.setValueAtTime(0.0001,t0);
+    g.gain.exponentialRampToValueAtTime(peak||0.06,t0+0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+    o.connect(g).connect(c.destination);
+    o.start(t0);o.stop(t0+dur+0.02);
+  }
+  return {
+    unlock(){ac();},
+    blip(n){const c=ac();if(!c)return;tone(520+(n||0)*70,c.currentTime,0.09,'square',0.10);},
+    grant(){const c=ac();if(!c)return;const t=c.currentTime;
+      tone(660,t,0.12,'triangle',0.14);
+      tone(880,t+0.10,0.12,'triangle',0.14);
+      tone(1320,t+0.20,0.32,'triangle',0.16);},
+    boot(){const c=ac();if(!c)return;sweep(180,720,c.currentTime,1.0,0.05);},
+    err(){const c=ac();if(!c)return;const t=c.currentTime;
+      tone(200,t,0.16,'sawtooth',0.10);
+      tone(140,t+0.14,0.22,'sawtooth',0.10);}
+  };
+})();
+
+/* ============================================================
    3D SCENE — particles + wireframe icosahedron + receding grid
    Hand-rolled canvas projection. Lightweight, additive glow.
 ============================================================ */
@@ -617,16 +663,17 @@ async function sendToTelegram(text){
     return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
   }
   check.addEventListener('click',async ()=>{
+    SND.unlock();
     const c=clean(inp.value);
     if(c.length!==8){
-      inp.classList.add('bad');
+      inp.classList.add('bad');SND.err();
       note.innerHTML='<span class="err">неверный формат ключа — нужно 8 символов</span>';return;
     }
     check.disabled=true;const prev=check.textContent;check.textContent='проверка…';
     const ok=(await sha256hex(c))===CODE_HASH;
     check.textContent=prev;check.disabled=false;
     if(!ok){
-      inp.classList.add('bad');
+      inp.classList.add('bad');SND.err();
       note.innerHTML='<span class="err">ключ отклонён — неверный инвайт-код</span>';return;
     }
     runGranted(fmt(c));
@@ -656,15 +703,17 @@ function runGranted(code){
   (function step(){
     if(i<seq.length){
       const d=document.createElement('div');d.innerHTML=seq[i];glog.appendChild(d);
+      SND.blip(i);
       i++;setTimeout(step,260);
     }else{
-      ov.classList.add('flash');
+      ov.classList.add('flash');SND.grant();
       setTimeout(()=>{gbig.classList.add('show');gbar.classList.add('show');},220);
       setTimeout(()=>{ov.classList.remove('flash');},700);
       setTimeout(()=>{
         const d=document.createElement('div');d.style.color='var(--green-dim)';d.style.marginTop='6px';
         d.innerHTML='> загрузка терминала equity ...';glog.appendChild(d);
         gclose.textContent='[ войти в терминал ]';gclose.classList.add('show');
+        SND.boot();
       },2000);
       setTimeout(()=>{location.href='app.html';},3200);
     }
