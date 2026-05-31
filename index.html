@@ -662,7 +662,12 @@ window.addEventListener('pageshow',()=>{resetGate();});
     open=!open;codebox.classList.toggle('open',open);
     if(open)setTimeout(()=>inp.focus(),300);
   });
-  function clean(v){return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);}
+  // раскладка ЙЦУКЕН → QWERTY: ввод кода работает и на русской раскладке
+  const RU2EN={'й':'q','ц':'w','у':'e','к':'r','е':'t','н':'y','г':'u','ш':'i','щ':'o','з':'p','х':'[','ъ':']','ф':'a','ы':'s','в':'d','а':'f','п':'g','р':'h','о':'j','л':'k','д':'l','ж':';','э':"'",'я':'z','ч':'x','с':'c','м':'v','и':'b','т':'n','ь':'m','б':',','ю':'.','ё':'`'};
+  function clean(v){
+    v=v.replace(/[а-яё]/gi,ch=>RU2EN[ch.toLowerCase()]||'');
+    return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+  }
   function fmt(v){return v.length>4?v.slice(0,4)+'-'+v.slice(4):v;}
   inp.addEventListener('input',()=>{
     const c=clean(inp.value);inp.value=fmt(c);
