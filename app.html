@@ -62,7 +62,7 @@
   .board-slots .gap{width:18px;text-align:center;color:var(--green-dim)}
   .board-slots .gap::after{content:"|"}
   .street-tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-  .street-tab{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:7px 14px;font-size:11px;letter-spacing:1px;cursor:pointer;text-transform:uppercase}
+  .street-tab{border:1px solid var(--line);background:#020a05;color:var(--green-dim);padding:7px 14px;font-size:11px;letter-spacing:1px;cursor:default;text-transform:uppercase}
   .street-tab.active{border-color:var(--green);color:var(--green);background:var(--green-deep);box-shadow:0 0 10px rgba(57,255,20,.3)}
   .btn-row{display:flex;gap:12px;flex-wrap:wrap}
   button.go{background:var(--green-deep);color:var(--green);border:1px solid var(--green);font-family:'JetBrains Mono';font-weight:700;font-size:14px;letter-spacing:1px;padding:13px 28px;cursor:pointer;text-transform:uppercase;text-shadow:0 0 6px var(--green);transition:.12s}
@@ -324,13 +324,14 @@
     </div>
     <div class="panel cards-panel cards-board" data-tag="борд">
       <h2>общие карты</h2>
-      <div class="street-tabs" id="streetTabs">
+      <div class="street-tabs" id="streetTabs" title="улица определяется автоматически по числу карт">
         <div class="street-tab active" data-n="0">префлоп</div>
         <div class="street-tab" data-n="3">флоп</div>
         <div class="street-tab" data-n="4">тёрн</div>
         <div class="street-tab" data-n="5">ривер</div>
       </div>
       <div class="board-slots" id="board"></div>
+      <div class="hint board-hint" id="boardHint" style="margin-top:8px"></div>
     </div>
     <div class="panel cards-panel cards-run" data-tag="запуск">
       <h2>расчёт</h2>
@@ -501,22 +502,16 @@ for(let n=2;n<=9;n++){const o=document.createElement('option');o.value=n;o.textC
 npSel.value=6;
 npSel.onchange=()=>{state.numPlayers=+npSel.value;syncOpps();renderOpps();};
 
-// street tabs
-document.querySelectorAll('.street-tab').forEach(tab=>{
-  tab.onclick=()=>{
-    const n=+tab.dataset.n;
-    state.streetN=n;
-    // очищаем слоты борда за пределами улицы
-    for(let i=n;i<5;i++) state.board[i]=null;
-    document.querySelectorAll('.street-tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    // сдвигаем активную цель на первый пустой слот новой улицы:
-    // уже выбранные карты остаются на месте, следующий клик идёт в новую улицу
-    activeTarget=nextEmptyTarget();
-    renderHero();
-    renderBoard();
-  };
-});
+// улица определяется автоматически по числу введённых карт борда:
+// 0 → префлоп · 3 → флоп · 4 → тёрн · 5 → ривер (1–2 = флоп в процессе)
+function syncStreet(){
+  const n=state.board.filter(c=>c).length;
+  state.streetN=n;
+  const tabN={0:0,1:3,2:3,3:3,4:4,5:5}[n];
+  document.querySelectorAll('.street-tab').forEach(t=>{
+    t.classList.toggle('active',+t.dataset.n===tabN);
+  });
+}
 
 function cardClass(card){if(!card)return '';return SUITS.find(x=>x.s===card[1]).c;}
 function cardLabel(card){if(!card)return '';const sym=SUITS.find(x=>x.s===card[1]).sym;const r=card[0]==='T'?'10':card[0];return r+sym;}
@@ -544,14 +539,17 @@ function renderHero(){
 }
 function renderBoard(){
   const bc=document.getElementById('board');bc.innerHTML='';
-  if(state.streetN===0){
-    bc.innerHTML='<div class="hint" style="margin:0">// префлоп — общих карт пока нет. Считаем твою руку против случайных рук соперников.</div>';
-    return;
-  }
-  for(let i=0;i<state.streetN;i++){
+  for(let i=0;i<5;i++){
     bc.appendChild(makeSlot(state.board[i],{type:'board',i}));
-    if(i===2&&state.streetN>3){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
-    if(i===3&&state.streetN>4){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
+    if(i===2){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
+    if(i===3){const g=document.createElement('div');g.className='gap';bc.appendChild(g);}
+  }
+  const hint=document.getElementById('boardHint');
+  if(hint){
+    const n=state.board.filter(c=>c).length;
+    if(n===0)hint.textContent='// префлоп — общих карт пока нет. Считаем твою руку против случайных рук соперников.';
+    else if(n<3)hint.textContent='// флоп: введи ещё '+(3-n)+((3-n)===1?' карту':' карты');
+    else hint.textContent='// '+['','','','флоп — 3 карты','тёрн — 4 карты','ривер — 5 карт'][n];
   }
 }
 function renderOpps(){
@@ -705,7 +703,7 @@ function updateOutcomeButtons(){
   if(wa)wa.textContent=money(profit);
   if(la)la.textContent=money(lastHeroBet);
 }
-function render(){renderHero();renderBoard();renderOpps();renderCardGrid();}
+function render(){syncStreet();renderHero();renderBoard();renderOpps();renderCardGrid();}
 
 // ---------- picker ----------
 // активная цель ввода: куда встанет следующая выбранная карта
@@ -714,7 +712,7 @@ function setActiveTarget(t){activeTarget=t;render();}
 // найти следующий пустой слот (hero -> board по текущей улице)
 function nextEmptyTarget(){
   for(let i=0;i<2;i++) if(!state.hero[i]) return {type:'hero',i};
-  for(let i=0;i<state.streetN;i++) if(!state.board[i]) return {type:'board',i};
+  for(let i=0;i<5;i++) if(!state.board[i]) return {type:'board',i};
   return null;
 }
 function openPicker(target){ setActiveTarget(target); }  // клик по слоту = сделать его активным
@@ -759,8 +757,8 @@ function autoCalc(){
   clearTimeout(autoTimer);
   autoTimer=setTimeout(()=>{
     if(!state.hero[0]||!state.hero[1])return;
-    const filled=state.board.slice(0,state.streetN).filter(c=>c).length;
-    if(filled!==state.streetN)return;
+    const n=state.board.filter(c=>c).length;
+    if(n!==0&&n!==3&&n!==4&&n!==5)return; // 1–2 карты борда = флоп ещё не собран
     runCalc();
   },120);
 }
@@ -771,8 +769,7 @@ document.getElementById('clearBtn').onclick=()=>{
   state.opps.forEach(o=>{o.status='live';o.bet=0;});
   state.heroBet=0;state.heroStatus='live';betOverride=null;
   document.getElementById('heroBet').value=0;
-  document.querySelectorAll('.street-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelector('.street-tab[data-n="0"]').classList.add('active');
+  activeTarget={type:'hero',i:0};
   render();recalcPot();
   document.getElementById('result').classList.remove('show');
   document.getElementById('decision').classList.remove('show');
@@ -865,7 +862,7 @@ function activeOpps(){
   return state.opps.filter(o=>o.status!=='fold').map(o=>({status:o.status,pos:o.pos}));
 }
 function simulate(iters){
-  const knownBoard=state.board.slice(0,state.streetN).filter(c=>c);
+  const knownBoard=state.board.filter(c=>c);
   const used=new Set();
   state.hero.forEach(c=>c&&used.add(c));
   knownBoard.forEach(c=>used.add(c));
@@ -922,7 +919,7 @@ function simulate(iters){
 
 // текущая комбинация героя (для подсказки силы)
 function heroMadeHand(){
-  const known=state.board.slice(0,state.streetN).filter(c=>c);
+  const known=state.board.filter(c=>c);
   const cards=[...state.hero.filter(c=>c),...known];
   if(cards.length<5) return null;
   const sc=evaluate7(cards);
@@ -931,7 +928,7 @@ function heroMadeHand(){
 
 // аутсы: карты, дающие СИЛЬНОЕ улучшение (стрит и выше), плюс отдельно учёт пар-в-сет
 function analyzeOuts(){
-  const known=state.board.slice(0,state.streetN).filter(c=>c);
+  const known=state.board.filter(c=>c);
   const hero=state.hero.filter(c=>c);
   if(hero.length<2||known.length<3||known.length>=5) return null; // только флоп/тёрн
   const cur=evaluate7([...hero,...known]);
@@ -1010,8 +1007,8 @@ function runCalc(){
   const err=document.getElementById('err');err.textContent='';
   const calcOk=document.getElementById('calcOk');if(calcOk)calcOk.textContent='';
   if(!state.hero[0]||!state.hero[1]){err.textContent='укажи обе свои карты.';return;}
-  const filled=state.board.slice(0,state.streetN).filter(c=>c).length;
-  if(filled!==state.streetN){err.textContent='заполни все открытые общие карты.';return;}
+  syncStreet();
+  if(state.streetN===1||state.streetN===2){err.textContent='для флопа нужно 3 карты борда.';return;}
   const iters=+document.getElementById('iters').value;
   calcBtn.disabled=true;calcBtn.textContent='считаю…';
   setTimeout(()=>{
