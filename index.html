@@ -252,7 +252,7 @@
 
       <div class="eyebrow">контур закрыт · вход по приглашению</div>
       <h1>POKER_<span class="u">EQUITY</span><span class="bk">_</span></h1>
-      <p class="lede">Закрытый тренажёр equity для узкого круга. <b>Считаем руки, а не угадываем.</b> Вход строго по инвайт-коду — либо по заявке с поручителем.</p>
+      <p class="lede"><b>Не ошибайся и выигрывай за счёт мат.вероятностей.</b> Вход строго по инвайт-коду — либо по заявке с поручителем.</p>
 
       <div class="statusline">
         <span class="badge"><span class="b-dot"></span>doors: closed</span>
@@ -424,9 +424,24 @@ const SND=(function(){
     boot(){const c=ac();if(!c)return;sweep(180,720,c.currentTime,1.0,0.05);},
     err(){const c=ac();if(!c)return;const t=c.currentTime;
       tone(200,t,0.16,'sawtooth',0.10);
-      tone(140,t+0.14,0.22,'sawtooth',0.10);}
+      tone(140,t+0.14,0.22,'sawtooth',0.10);},
+    sleep(){if(ctx&&ctx.state==='running')ctx.suspend();}
   };
 })();
+
+/* ============================================================
+   BACK NAV — мгновенный возврат на стартовую без лагов
+   При возврате из app.html (bfcache или перезагрузка) сбрасываем
+   оверлей входа, чтобы стартовая страница показалась чистой.
+============================================================ */
+function resetGate(){
+  if(typeof _redirTimer!=='undefined'&&_redirTimer){clearTimeout(_redirTimer);_redirTimer=null;}
+  const ov=document.getElementById('granted');
+  if(ov){ov.classList.remove('show','flash');}
+  const glog=document.getElementById('glog');if(glog)glog.innerHTML='';
+}
+window.addEventListener('pagehide',()=>{SND.sleep();});
+window.addEventListener('pageshow',()=>{resetGate();});
 
 /* ============================================================
    3D SCENE — particles + wireframe icosahedron + receding grid
@@ -715,11 +730,12 @@ function runGranted(code){
         gclose.textContent='[ войти в терминал ]';gclose.classList.add('show');
         SND.boot();
       },2000);
-      setTimeout(()=>{location.href='app.html';},3200);
+      _redirTimer=setTimeout(()=>{location.href='app.html';},3200);
     }
   })();
   document.getElementById('gclose').onclick=()=>{location.href='app.html';};
 }
+let _redirTimer=null;
 
 /* ============================================================
    APPLICATION MODAL
