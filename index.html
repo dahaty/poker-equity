@@ -510,6 +510,10 @@ document.querySelectorAll('.street-tab').forEach(tab=>{
     for(let i=n;i<5;i++) state.board[i]=null;
     document.querySelectorAll('.street-tab').forEach(t=>t.classList.remove('active'));
     tab.classList.add('active');
+    // сдвигаем активную цель на первый пустой слот новой улицы:
+    // уже выбранные карты остаются на месте, следующий клик идёт в новую улицу
+    activeTarget=nextEmptyTarget();
+    renderHero();
     renderBoard();
   };
 });
