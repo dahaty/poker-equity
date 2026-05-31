@@ -85,7 +85,7 @@
   .eq-card .sub{font-size:10px;color:var(--green-dim);margin-top:6px}
   /* цветовые зоны шанса выигрыша */
   .eq-card.win.z-dom{border-color:#39ff14;box-shadow:0 0 22px rgba(57,255,20,.45),0 0 22px rgba(57,255,20,.25) inset}
-  .eq-card.win.z-dom .num{color:#39ff14;text-shadow:0 0 16px #39ff14,0 0 30px rgba(57,255,20,.7);animation:pulse 1.4s ease-in-out infinite}
+  .eq-card.win.z-dom .num{color:#39ff14;text-shadow:0 0 16px #39ff14,0 0 30px rgba(57,255,20,.7)}
   .eq-card.win.z-ahead{border-color:#7dff5a;box-shadow:0 0 14px rgba(125,255,90,.35)}
   .eq-card.win.z-ahead .num{color:#7dff5a;text-shadow:0 0 12px rgba(125,255,90,.6)}
   .eq-card.win.z-even{border-color:#ffe066}
@@ -163,6 +163,8 @@
   .note::before{content:"/* ";}.note::after{content:" */"}
   .err{color:var(--amber);font-size:12px;margin-top:10px;min-height:18px;letter-spacing:.5px}
   .err:not(:empty)::before{content:"ERR >> "}
+  .calc-ok{color:var(--green);font-size:13px;margin-top:8px;min-height:16px;letter-spacing:.5px;text-shadow:0 0 6px rgba(57,255,20,.5)}
+  .calc-ok:not(:empty)::before{content:"✓ "}
   .hint{font-size:10px;color:var(--green-dim);margin-top:8px;line-height:1.6}
   /* панель статистики сессии */
   .session-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
@@ -337,6 +339,7 @@
         <button class="ghost" id="clearBtn">следующая игра</button>
       </div>
       <div class="err" id="err"></div>
+      <div class="calc-ok" id="calcOk"></div>
     </div>
   </div>
 
@@ -770,6 +773,7 @@ document.getElementById('clearBtn').onclick=()=>{
   document.getElementById('result').classList.remove('show');
   document.getElementById('decision').classList.remove('show');
   const ph=document.getElementById('placeholder');if(ph)ph.style.display='block';
+  const ok=document.getElementById('calcOk');if(ok)ok.textContent='';
   lastEquity=null;
 };
 
@@ -1000,6 +1004,7 @@ function renderPostflop(activeCount){
 const calcBtn=document.getElementById('calcBtn');
 function runCalc(){
   const err=document.getElementById('err');err.textContent='';
+  const calcOk=document.getElementById('calcOk');if(calcOk)calcOk.textContent='';
   if(!state.hero[0]||!state.hero[1]){err.textContent='укажи обе свои карты.';return;}
   const filled=state.board.slice(0,state.streetN).filter(c=>c).length;
   if(filled!==state.streetN){err.textContent='заполни все открытые общие карты.';return;}
@@ -1117,6 +1122,7 @@ function showEquity(win,tie,iters,ms,activeCount,raisers,callers,exact){
   else renderPostflop(activeCount);
   document.getElementById('result').classList.add('show');
   const ph=document.getElementById('placeholder');if(ph)ph.style.display='none';
+  const ok=document.getElementById('calcOk');if(ok)ok.textContent='рассчитано';
   computeDecision();
 }
 
